@@ -9,10 +9,16 @@ import shutil
 
 import torch
 from experiments import generate_experiment_cfgs
+
+from experiments_custom import generate_experiment_cfgs as generate_experiment_cfgs_custom
+CUSTOM = True
+
 from mmcv import Config, get_git_hash
 
-from mmseg.apis import set_random_seed
+# from mmseg.apis import set_random_seed
 from tools import train
+
+DEBUG = False
 
 
 def run_command(command):
@@ -48,6 +54,12 @@ if __name__ == "__main__":
         type=int,
         default=0,
         help="1 to log results on wandb",
+    )
+    parser.add_argument(
+        "--custom",
+        type=int,
+        default=1,
+        help="activate CUSTOM mode"
     )
 
     parser.add_argument("--machine", type=str, choices=["local"], default="local")
@@ -88,7 +100,12 @@ if __name__ == "__main__":
     if args.exp is not None:
         for exp in args.exp:
             exp_name = f"{args.machine}-exp{exp}"
-            cfgs_aux = generate_experiment_cfgs(exp)
+
+            if CUSTOM:
+                cfgs_aux = generate_experiment_cfgs_custom(exp)
+            else:
+                cfgs_aux = generate_experiment_cfgs(exp)
+
             # Generate Configs
             for i, cfg in enumerate(cfgs_aux):
                 if args.debug:
@@ -102,6 +119,8 @@ if __name__ == "__main__":
                     f'{datetime.now().strftime("%y%m%d_%H%M")}_'
                     f'{cfg["name"]}_{str(uuid.uuid4())[:5]}'
                 )
+                if DEBUG:
+                    cfg["name"] = f"debug_{cfg['name']}"
                 cfg["work_dir"] = os.path.join("work_dirs", exp_name, cfg["name"])
                 cfg["git_rev"] = get_git_hash()
                 tags = cfg["tags"].copy()

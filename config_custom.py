@@ -1,4 +1,3 @@
-
 datasets = [
     ("cityscapes", "rain"),
     # ('shift', 'shift'),
@@ -9,12 +8,15 @@ domain_order = [
 ]
 num_epochs = 3
 
-models = [
-    # ("segformer", "mitb1"),
+models = [ # (architecture, backbone)
+    # ("segformer", "mitb5_custom"),
+    # ("segformer", "mitb1")
     ("segformer", "mitb5")
+    # ("upernet", "swin")
 ]
 udas = [
     "dacs_online", # Hamlet UDA
+    # "custom_dacs_online"
 ]
 
 max_lr = [
@@ -23,7 +25,8 @@ max_lr = [
 
 lr = [
     # 6e-5
-    0.000015,
+    # 0.000015,
+    0.00015,
 ]
 
 lr_policy = [
@@ -90,16 +93,22 @@ reduce_training = [
 batch_size = 1
 iters = 40000
 
-#modules_update = "random_modules/random_[0.25, 0.25, 0.25, 0.25].npy"
+# modules_update = "random_modules/random_[0.25, 0.25, 0.25, 0.25].npy"
 modules_update = "random_modules/online_random.npy"
-# pretrained_segmentator = "pretrained/mitb1_uda.pth"
-# pretrained_segmentator = "pretrained/segformer.b1.512x512.ade.160k.pth"
+# modules_update = None
+# pretrained_segmentator = "pretrained/mitb5_uda.pth"
+# pretrained_segmentator = "pretrained/mit_b5.pth"
 # pretrained_segmentator = "pretrained/segformer.b1.1024x1024.city.160k.pth"
-pretrained_segmentator = "work_dirs/local-exp-1/231112_1839_cs2rain_dacs_online_rcs001_cpl_segformer_mitb5_fixed_s0_dc236/new_epoch_10.pth"
+# pretrained_segmentator = "pretrained/segformer.b3.1024x1024.city.160k.pth"
+pretrained_segmentator = "pretrained/segformer.b5.1024x1024.city.160k.pth"      #segformer (evaluation)
+# pretrained_segmentator = "pretrained/upernet_swin_tiny_patch4_window7_512x512.pth"
 student_pretrained = pretrained_segmentator
 
 seed = [0]
 perfect_determinism = False
 deterministic = False
 
-freeze_backbone = False #!DETERMINED
+#!DEBUG
+freeze_backbone = True
+pmult = False
+
