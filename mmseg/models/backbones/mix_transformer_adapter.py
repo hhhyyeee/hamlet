@@ -235,7 +235,7 @@ class MixVisionTransformer(BaseModule):
                           'please use "init_cfg" instead')
         else:
             raise TypeError('pretrained must be a str or None')
- 
+
         self.num_classes = num_classes
         self.depths = depths
         self.pretrained = pretrained
@@ -243,7 +243,8 @@ class MixVisionTransformer(BaseModule):
 
         # PET
         a=1
-        PET = hasattr(cfg, "adapt_blocks")
+        # PET = hasattr(cfg, "adapt_blocks")
+        PET = "adapt_blocks" in cfg
         if PET:
             adapt_blocks = cfg["adapt_blocks"]
             pet_cls = cfg["pet_cls"]
