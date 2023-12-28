@@ -335,10 +335,9 @@ or (
 * Decoder Head도 pretrained weights 붙일 수 있게 하기
 
 * Static Teacher 없애버리기
-    -  `configs/_base_/uda/dacs_a999_fdthings.py` 에서 imnet_feature_dist_lambda를 0으로 설정하면 imnet_head 뺄수있음
+    - `configs/_base_/uda/dacs_a999_fdthings.py` 에서 imnet_feature_dist_lambda를 0으로 설정하면 imnet_head 뺄수있음
     - 근데 이 옵션이 구현은 안돼있음 개뿍침
-
-
+    - 구현함
 
 
 # 231203
@@ -439,10 +438,48 @@ or (
         ```
         - show=False, out_dir=None 일 때 pred 디렉토리 출력하지 않음
 
-* 
+
+# 231215
+## Todo
+* Swin Transformer backbone 붙이기
+* Teacher 선언시 adapter 안붙이고 완전히 freeze하게 할 수 있도록
+    - 옵션으로 구현?
+* Decoder Head도 pretrained weights 붙일 수 있게 하기
+    - Hamlet은 full ft였던거 같은데 정확히 모르겠음
+* EwC 모듈 구현
+
+## 구현 및 변경사항
+* `mmseg/models/backbones/mix_transformer_adapter.py` (231205?)
+    - PET 모듈 옵션 설정 시 hasattr 쓰면 제대로 동작 안해서 바꿈
+        - git log number: 4f6ceecd6bdc776089d45344ec4d6c890d255202
+        ```
+            # PET
+            a=1
+            # PET = hasattr(cfg, "adapt_blocks")
+            PET = "adapt_blocks" in cfg
+            if PET:
+                adapt_blocks = cfg["adapt_blocks"]
+                pet_cls = cfg["pet_cls"]
+                pet_kwargs = {"scale": None}
+
+                self.embed_dims_adapter = [_dim for idx, _dim in enumerate(embed_dims) if idx in adapt_blocks]
+        ```
 
 
+# 231215
+## 구현 및 변경사항
+* Decoder Head도 pretrained weights 붙일 수 있도록 변경
+    - toc serial: S00021
+
+## Todo
+* Swin Transformer backbone 붙이기
+* Teacher 선언시 adapter 안붙이고 완전히 freeze하게 할 수 있도록
+    - 옵션으로 구현?
+* EwC 모듈 구현
 
 
+# 231228
+## 구현 및 변경사항
+* MiT B0 custom 모드로 adapter 붙여서 사용할 수 있도록 변경
 
 

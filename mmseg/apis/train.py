@@ -57,6 +57,11 @@ def train_segmentor(
         # for param in model.model.backbone.parameters():
         #     param.requires_grad = False
 
+    from tools.get_param_count import count_parameters
+    a=1
+    count_parameters(model.model)
+    count_parameters(model.ema_model)
+
     if "video" in cfg["mode"]:
         data_loaders = [
             build_dataloader(

@@ -10,8 +10,9 @@ def get_model_base(architecture, backbone):
     architecture = architecture.replace("little", "")
     if "segformer" in architecture:
         return {
-            "mitb5_custom": f"_base_/models/{architecture}_b5_custom.py",
+            "mitb0_custom": f"_base_/models/{architecture}_b0_custom.py",
             "mitb3_custom": f"_base_/models/{architecture}_b5_custom.py",
+            "mitb5_custom": f"_base_/models/{architecture}_b5_custom.py",
 
             "mitb5": f"_base_/models/{architecture}_b5.py",
             # It's intended that <=b4 refers to b5 config
