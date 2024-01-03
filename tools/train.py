@@ -93,10 +93,10 @@ def main(args):
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
 
-    a=1
     from run_experiments import CUSTOM
     if CUSTOM:
         cfg["custom"] = cfg["uda"].copy()
+        cfg["custom"]["freeze_backbone"] = cfg["freeze_backbone"]
 
     # work_dir is determined in this priority: CLI > segment in file > filename
     if args.work_dir is not None:

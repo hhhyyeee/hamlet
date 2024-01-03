@@ -115,6 +115,13 @@ class DACS(CustomUDADecorator):
         self.dacs_ratio = self.fixed_dacs = 0.5
         self.use_domain_indicator = cfg["use_domain_indicator"]
 
+        a=1
+        if cfg["freeze_backbone"]:
+            from mmseg.models.utils import freeze #!DEBUG
+            freeze(self.model.backbone)
+            freeze(self.ema_model.backbone)
+            a=1
+
     def get_ema_model(self):
         return get_module(self.ema_model)
 
@@ -144,6 +151,7 @@ class DACS(CustomUDADecorator):
                     alpha_teacher * ema_param[:].data[:] + (1 - alpha_teacher) * param[:].data[:]
                 )
 
+    # @profile
     def _val_step(self, img, img_metas, gt_semantic_seg, target_img, target_img_metas):
         log_vars = {}
         student = self.get_model()
@@ -202,6 +210,7 @@ class DACS(CustomUDADecorator):
             teacher_losses = add_prefix(teacher_losses, "teacher")
             log_vars.update(teacher_losses)
 
+    # @profile
     def train_step(self, data_batch, optimizer, **kwargs):
         """The iteration step during training.
 
@@ -322,6 +331,7 @@ class DACS(CustomUDADecorator):
         feat_log.pop("loss", None)
         return feat_loss, feat_log
 
+    # @profile
     def forward_train(self, img, img_metas, gt_semantic_seg, target_img, target_img_metas):
         """Forward function for training.
 
