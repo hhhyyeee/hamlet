@@ -12,6 +12,8 @@ model = dict(
     backbone=dict(
         type='mit_b0',
         style='pytorch',
+        pet_cls='Adapter',
+        adapt_blocks=[0, 1]
         ),
     decode_head=dict(
         type='OriginalSegFormerHead',

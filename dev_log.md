@@ -481,5 +481,83 @@ or (
 # 231228
 ## 구현 및 변경사항
 * MiT B0 custom 모드로 adapter 붙여서 사용할 수 있도록 변경
+    - git log number: e60c4a1d37eccd2957d64f1aca8f600991a9928d
+
+
+# 231229
+## line_profiler
+* backbone full ft vs. adapter w/ frozen backbone: 비교분석
+    - b3_noadapter_melt (=> total 87.5%)
+        - update_ema : 14.1%
+        - clean_losses = self.get_model().forward_train(...) (Train on source images) : 13.4%
+        - ema_logits = self.get_ema_model().encode_decode(...) (Generate pseudo-label) : 10.0%
+        - mix_losses = self.get_model().forward_train(...) (Train on mixed images) : 12.0%
+        - (?) confidence of the student of the target and simulate prediction : 9.5% -> 이거 뭔데 있지?
+        - (clean_loss + mix_loss).backward() : 28.5%
+        ```
+            Line #      Hits         Time  Per Hit   % Time  Line Contents
+               487      2975  427696063.7 143763.4     28.5              (clean_loss + mix_loss).backward()
+        ```
+
+    - b3_halfadapter_frozen (=> total 86.5%)
+        - update_ema : 16.2%
+        - clean_losses = self.get_model().forward_train(...) (Train on source images) : 14.6%
+        - ema_logits = self.get_ema_model().encode_decode(...) (Generate pseudo-label) : 11.2%
+        - mix_losses = self.get_model().forward_train(...) (Train on mixed images) : 13.4%
+        - (?) confidence of the student of the target and simulate prediction : 10.6%
+        - (clean_loss + mix_loss).backward() : 20.5%
+        ```
+            Line #      Hits         Time  Per Hit   % Time  Line Contents
+               487      2975  285331228.9  95909.7     20.5              (clean_loss + mix_loss).backward()
+        ```
+
+    - 의견
+        - 1회 backprop 하는데 걸리는 시간이 full ft는 143,763ns인데 비해 half adapter는 95,909ns로 half adapter가 66%나 된다
+        - learnable params 개수가 47M vs. 3M으로 약 16배 차이나는데도 불구하고 이럼... 왤까?
+
+
+# 240103
+
+## 연구미팅 정리
+* 작은 backbone 모델
+
+## 구현 및 변경사항
+* 
+
+* full/half adapter 여부 config에서 설정가능하도록 변경
+    - `experiments_custom.py`
+        ```
+            def get_model_base(architecture, backbone):
+                ...
+                if "custom" in backbone:        #!DEBUG
+                    if "adpt" in backbone:      #!DEBUG
+                        backbone_, _, adapt = backbone.split("_")
+                        return {
+                            "mitb5": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                            # It's intended that <=b4 refers to b5 config
+                            "mitb4": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                            "mitb3": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                            "mitb2": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                            "mitb1": f"_base_/models/{architecture}_b1.py",
+                            "mitb0": f"_base_/models/{architecture}_b0_custom_{adapt}.py",
+                        }[backbone_]
+                    else:
+                        backbone_, _ = backbone.split("_")
+                        return {
+                            "mitb5": f"_base_/models/{architecture}_b5_custom.py",
+                            # It's intended that <=b4 refers to b5 config
+                            "mitb4": f"_base_/models/{architecture}_b5_custom.py",
+                            "mitb3": f"_base_/models/{architecture}_b5_custom.py",
+                            "mitb2": f"_base_/models/{architecture}_b5_custom.py",
+                            "mitb1": f"_base_/models/{architecture}_b1.py",
+                            "mitb0": f"_base_/models/{architecture}_b0_custom.py",
+                        }[backbone_]
+        ```
+        - `custom`, `adpt` 키워드를 통해 model config 파일 선택하여 리턴
+        - adapter half, full 각각 adpt1, adpt2로 표기함
+
+## additional CNN network
+* 
+    - git log number: 12fe661bd9c4bdd233546a9b2043b2413f21561a
 
 
