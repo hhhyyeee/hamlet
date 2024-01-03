@@ -51,14 +51,13 @@ def train_segmentor(
     # prepare data loaders
     dataset = dataset if isinstance(dataset, (list, tuple)) else [dataset]
 
-    a=1
     if cfg["freeze_backbone"]: #!DEBUG
         freeze(model.model.backbone)
+        freeze(model.ema_model.backbone)
         # for param in model.model.backbone.parameters():
         #     param.requires_grad = False
 
-    from tools.get_param_count import count_parameters
-    a=1
+    from tools.get_param_count import count_parameters #!DEBUG
     count_parameters(model.model)
     count_parameters(model.ema_model)
 
@@ -117,7 +116,8 @@ def train_segmentor(
         model = MMDataParallel(model.cuda(cfg.gpu_ids[0]), device_ids=cfg.gpu_ids)
 
     # build runner
-    optimizer = build_optimizer(model, cfg.optimizer)
+    optimizer = build_optimizer(model.module.model, cfg.optimizer)
+    # optimizer = build_optimizer(model, cfg.optimizer)
 
     if cfg.get("runner") is None:
         cfg.runner = {"type": "IterBasedRunner", "max_iters": cfg.total_iters}
