@@ -249,6 +249,7 @@ class MixVisionTransformer(BaseModule):
             pet_cls = cfg["pet_cls"]
             pet_kwargs = {"scale": None}
 
+            a=1
             self.embed_dims_adapter = [_dim for idx, _dim in enumerate(embed_dims) if idx in adapt_blocks]
 
         # --- auxiliary classifier
@@ -582,9 +583,9 @@ class MixVisionTransformer(BaseModule):
 
         if self.pet_cls == "Adapter":
             adapter_list_list = []
-            for idx, embed_dim in enumerate(embed_dims):
+            for idx, (_block_idx, embed_dim) in enumerate(zip(self.adapt_blocks, embed_dims)):
                 adapter_list = []
-                for _ in range(depths[idx]):
+                for _ in range(depths[_block_idx]):
                     kwargs = dict(**self.pet_kwargs)
                     kwargs["embed_dim"] = embed_dim
                     # adapter_list.append(Adapter(**kwargs))
@@ -608,9 +609,10 @@ class MixVisionTransformer(BaseModule):
 
         pets = self.pets
         if self.pet_cls == "Adapter":
-            for _dim_idx, _dim in enumerate(self.embed_dims_adapter):
+            for _idx, (_dim_idx, _dim) in enumerate(zip(self.adapt_blocks, self.embed_dims_adapter)):
+            # for _dim_idx, _dim in enumerate(self.embed_dims_adapter):
                 for _depth_idx in range(self.depths[_dim_idx]):
-                    eval(f"self.block{_dim_idx + 1}")[_depth_idx].attach_adapter(mlp=pets[_dim_idx][_depth_idx])
+                    eval(f"self.block{_dim_idx + 1}")[_depth_idx].attach_adapter(mlp=pets[_idx][_depth_idx])
             return
 
         if self.pet_cls == "LoRA":

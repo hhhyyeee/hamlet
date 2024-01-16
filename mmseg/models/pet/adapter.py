@@ -23,6 +23,7 @@ class Adapter(nn.Module):
 
         assert mode in ["before", "after", "parallel"], f"Unknown mode {mode}"
 
+        self.embed_dim = embed_dim
         hidden_dim = down_sample
         if isinstance(down_sample, float):
             hidden_dim = int(embed_dim * down_sample)
