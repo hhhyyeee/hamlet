@@ -18,7 +18,7 @@ def get_model_base(architecture, backbone):
                     "mitb4": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
                     "mitb3": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
                     "mitb2": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
-                    "mitb1": f"_base_/models/{architecture}_b1.py",
+                    "mitb1": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
                     "mitb0": f"_base_/models/{architecture}_b0_custom_{adapt}.py",
                 }[backbone_]
             else:
@@ -29,7 +29,7 @@ def get_model_base(architecture, backbone):
                     "mitb4": f"_base_/models/{architecture}_b5_custom.py",
                     "mitb3": f"_base_/models/{architecture}_b5_custom.py",
                     "mitb2": f"_base_/models/{architecture}_b5_custom.py",
-                    "mitb1": f"_base_/models/{architecture}_b1.py",
+                    "mitb1": f"_base_/models/{architecture}_b5_custom.py",
                     "mitb0": f"_base_/models/{architecture}_b0_custom.py",
                 }[backbone_]
         return {
@@ -98,10 +98,8 @@ def get_pretraining_file(backbone):
 
 
 def get_backbone_cfg(backbone):
-    a=1
     for i in [0, 1, 2, 3, 4, 5]:
         if f"mitb{i}" in backbone:
-            a=1
         # if (backbone == f"mitb{i}") | (backbone == f"mitb{i}_custom"):
         # if backbone == f"mitb{i}":
             return dict(type=f"mit_b{i}")

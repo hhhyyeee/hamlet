@@ -16,7 +16,6 @@ from mmseg.core import DistEvalHook, EvalHook, OnlineEvalHook
 from mmseg.core.ddp_wrapper import DistributedDataParallelWrapper
 from mmseg.core.evaluation.eval_hooks import ShiftEvalHook, VideoEvalHook
 from mmseg.datasets import build_dataloader, build_dataset
-from mmseg.models.utils import freeze #!DEBUG
 from mmseg.utils import get_root_logger
 from online_src.online_runner import OnlineRunner
 from online_src.others_runner import OthersRunner
@@ -51,11 +50,12 @@ def train_segmentor(
     # prepare data loaders
     dataset = dataset if isinstance(dataset, (list, tuple)) else [dataset]
 
-    if cfg["freeze_backbone"]: #!DEBUG
-        freeze(model.model.backbone)
-        freeze(model.ema_model.backbone)
-        # for param in model.model.backbone.parameters():
-        #     param.requires_grad = False
+    # if cfg["freeze_backbone"]: #!DEBUG
+    #     from mmseg.models.utils import freeze #!DEBUG
+    #     freeze(model.model.backbone)
+    #     freeze(model.ema_model.backbone)
+    #     # for param in model.model.backbone.parameters():
+    #     #     param.requires_grad = False
 
     from tools.get_param_count import count_parameters #!DEBUG
     count_parameters(model.model)

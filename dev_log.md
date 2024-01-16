@@ -254,7 +254,6 @@ or (
         if cfg["freeze_backbone"]: #!DEBUG
             for param in model.model.backbone.parameters():
                 param.requires_grad = False
-
         ```
 
 * OthersEncoderDecoder 활용시 EvalHook에서 제대로된 스코어 출력하도록 구현
@@ -354,47 +353,47 @@ or (
 * `mmseg/core/evaluation/eval_hooks.py`
     - show_result 옵션 끄기
         ```
-            from mmseg.apis import single_gpu_test
+        from mmseg.apis import single_gpu_test
 
-            for dataloader in self.dataloaders:
-                dataset_name = dataloader.dataset.name
-                results = single_gpu_test(
-                    runner.model,
-                    dataloader,
-                    # show=True,
-                    show=False,
-                    # out_dir=self.work_dir,
-                    out_dir=None,
-                    num_epoch=runner.iter,
-                    dataset_name=dataset_name,
-                    img_to_pred=self.img_to_pred,
-                    efficient_test=self.efficient_test,
-                )
-                self.evaluate(dataloader, runner, results, dataset_name)
-                # ugly way to ensure ram does not crash having multiple val datasets
-                gc.collect()
+        for dataloader in self.dataloaders:
+            dataset_name = dataloader.dataset.name
+            results = single_gpu_test(
+                runner.model,
+                dataloader,
+                # show=True,
+                show=False,
+                # out_dir=self.work_dir,
+                out_dir=None,
+                num_epoch=runner.iter,
+                dataset_name=dataset_name,
+                img_to_pred=self.img_to_pred,
+                efficient_test=self.efficient_test,
+            )
+            self.evaluate(dataloader, runner, results, dataset_name)
+            # ugly way to ensure ram does not crash having multiple val datasets
+            gc.collect()
         ```
 * `mmseg/apis/train.py`
     - test time batch size 8->1
         ```
-            # register eval hooks
-            if validate:
-                samples = 1
-                # samples = 8 #!DEBUG
-                if "online" in cfg:
-                    val_datasets = [build_dataset(val) for val in cfg.online.val]
-                    val_dataloader = [
-                        build_dataloader(
-                            ds,
-                            samples_per_gpu=samples,
-                            workers_per_gpu=cfg.data.workers_per_gpu,
-                            dist=distributed,
-                            shuffle=False,
-                        )
-                        for ds in val_datasets
-                    ]
-                    eval_hook = OnlineEvalHook
-                    eval_hook = eval_hook if "video" not in cfg["mode"] else VideoEvalHook
+        # register eval hooks
+        if validate:
+            samples = 1
+            # samples = 8 #!DEBUG
+            if "online" in cfg:
+                val_datasets = [build_dataset(val) for val in cfg.online.val]
+                val_dataloader = [
+                    build_dataloader(
+                        ds,
+                        samples_per_gpu=samples,
+                        workers_per_gpu=cfg.data.workers_per_gpu,
+                        dist=distributed,
+                        shuffle=False,
+                    )
+                    for ds in val_datasets
+                ]
+                eval_hook = OnlineEvalHook
+                eval_hook = eval_hook if "video" not in cfg["mode"] else VideoEvalHook
         ```
 
 * Genetic Algorithm을 사용할 hyperparameter tuning 실험 설계
@@ -405,36 +404,36 @@ or (
 * `mmseg/core/evaluation/eval_hooks.py`
     - DEBUG 모드에만 pred 디렉토리 출력하도록 변경
         ```
-            def _do_evaluate(self, runner):
-                """perform evaluation and save ckpt."""
-                if not self._should_evaluate(runner):
-                    return
+        def _do_evaluate(self, runner):
+            """perform evaluation and save ckpt."""
+            if not self._should_evaluate(runner):
+                return
 
-                self.first = False
-                from mmseg.apis import single_gpu_test
+            self.first = False
+            from mmseg.apis import single_gpu_test
 
-                from run_experiments import DEBUG
-                show = False
-                out_dir = None
-                if DEBUG:
-                    show = True
-                    out_dir = self.out_dir
+            from run_experiments import DEBUG
+            show = False
+            out_dir = None
+            if DEBUG:
+                show = True
+                out_dir = self.out_dir
 
-                for dataloader in self.dataloaders:
-                    dataset_name = dataloader.dataset.name
-                    results = single_gpu_test(
-                        runner.model,
-                        dataloader,
-                        show=show,
-                        out_dir=out_dir,
-                        num_epoch=runner.iter,
-                        dataset_name=dataset_name,
-                        img_to_pred=self.img_to_pred,
-                        efficient_test=self.efficient_test,
-                    )
-                    self.evaluate(dataloader, runner, results, dataset_name)
-                    # ugly way to ensure ram does not crash having multiple val datasets
-                    gc.collect()
+            for dataloader in self.dataloaders:
+                dataset_name = dataloader.dataset.name
+                results = single_gpu_test(
+                    runner.model,
+                    dataloader,
+                    show=show,
+                    out_dir=out_dir,
+                    num_epoch=runner.iter,
+                    dataset_name=dataset_name,
+                    img_to_pred=self.img_to_pred,
+                    efficient_test=self.efficient_test,
+                )
+                self.evaluate(dataloader, runner, results, dataset_name)
+                # ugly way to ensure ram does not crash having multiple val datasets
+                gc.collect()
         ```
         - show=False, out_dir=None 일 때 pred 디렉토리 출력하지 않음
 
@@ -453,16 +452,16 @@ or (
     - PET 모듈 옵션 설정 시 hasattr 쓰면 제대로 동작 안해서 바꿈
         - git log number: 4f6ceecd6bdc776089d45344ec4d6c890d255202
         ```
-            # PET
-            a=1
-            # PET = hasattr(cfg, "adapt_blocks")
-            PET = "adapt_blocks" in cfg
-            if PET:
-                adapt_blocks = cfg["adapt_blocks"]
-                pet_cls = cfg["pet_cls"]
-                pet_kwargs = {"scale": None}
+        # PET
+        a=1
+        # PET = hasattr(cfg, "adapt_blocks")
+        PET = "adapt_blocks" in cfg
+        if PET:
+            adapt_blocks = cfg["adapt_blocks"]
+            pet_cls = cfg["pet_cls"]
+            pet_kwargs = {"scale": None}
 
-                self.embed_dims_adapter = [_dim for idx, _dim in enumerate(embed_dims) if idx in adapt_blocks]
+            self.embed_dims_adapter = [_dim for idx, _dim in enumerate(embed_dims) if idx in adapt_blocks]
         ```
 
 
@@ -495,8 +494,8 @@ or (
         - (?) confidence of the student of the target and simulate prediction : 9.5% -> 이거 뭔데 있지?
         - (clean_loss + mix_loss).backward() : 28.5%
         ```
-            Line #      Hits         Time  Per Hit   % Time  Line Contents
-               487      2975  427696063.7 143763.4     28.5              (clean_loss + mix_loss).backward()
+        Line #      Hits         Time  Per Hit   % Time  Line Contents
+            487      2975  427696063.7 143763.4     28.5              (clean_loss + mix_loss).backward()
         ```
 
     - b3_halfadapter_frozen (=> total 86.5%)
@@ -507,8 +506,8 @@ or (
         - (?) confidence of the student of the target and simulate prediction : 10.6%
         - (clean_loss + mix_loss).backward() : 20.5%
         ```
-            Line #      Hits         Time  Per Hit   % Time  Line Contents
-               487      2975  285331228.9  95909.7     20.5              (clean_loss + mix_loss).backward()
+        Line #      Hits         Time  Per Hit   % Time  Line Contents
+            487      2975  285331228.9  95909.7     20.5              (clean_loss + mix_loss).backward()
         ```
 
     - 의견
@@ -522,42 +521,133 @@ or (
 * 작은 backbone 모델
 
 ## 구현 및 변경사항
-* 
+* ema_model backbone도 freeze할 수 있도록 변경; optimizer가 model.module.model만 쳐다보도록 변경
+    - `mmseg/apis/train.py`
+        ```
+        if cfg["freeze_backbone"]: #!DEBUG
+            freeze(model.model.backbone)
+            freeze(model.ema_model.backbone)
+        ```
+        ```
+        # build runner
+        optimizer = build_optimizer(model.module.model, cfg.optimizer)
+        ```
+    - git log number: 12fe661bd9c4bdd233546a9b2043b2413f21561a
 
 * full/half adapter 여부 config에서 설정가능하도록 변경
     - `experiments_custom.py`
         ```
-            def get_model_base(architecture, backbone):
-                ...
-                if "custom" in backbone:        #!DEBUG
-                    if "adpt" in backbone:      #!DEBUG
-                        backbone_, _, adapt = backbone.split("_")
-                        return {
-                            "mitb5": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
-                            # It's intended that <=b4 refers to b5 config
-                            "mitb4": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
-                            "mitb3": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
-                            "mitb2": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
-                            "mitb1": f"_base_/models/{architecture}_b1.py",
-                            "mitb0": f"_base_/models/{architecture}_b0_custom_{adapt}.py",
-                        }[backbone_]
-                    else:
-                        backbone_, _ = backbone.split("_")
-                        return {
-                            "mitb5": f"_base_/models/{architecture}_b5_custom.py",
-                            # It's intended that <=b4 refers to b5 config
-                            "mitb4": f"_base_/models/{architecture}_b5_custom.py",
-                            "mitb3": f"_base_/models/{architecture}_b5_custom.py",
-                            "mitb2": f"_base_/models/{architecture}_b5_custom.py",
-                            "mitb1": f"_base_/models/{architecture}_b1.py",
-                            "mitb0": f"_base_/models/{architecture}_b0_custom.py",
-                        }[backbone_]
+        def get_model_base(architecture, backbone):
+            ...
+            if "custom" in backbone:        #!DEBUG
+                if "adpt" in backbone:      #!DEBUG
+                    backbone_, _, adapt = backbone.split("_")
+                    return {
+                        "mitb5": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                        # It's intended that <=b4 refers to b5 config
+                        "mitb4": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                        "mitb3": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                        "mitb2": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                        "mitb1": f"_base_/models/{architecture}_b1.py",
+                        "mitb0": f"_base_/models/{architecture}_b0_custom_{adapt}.py",
+                    }[backbone_]
+                else:
+                    backbone_, _ = backbone.split("_")
+                    return {
+                        "mitb5": f"_base_/models/{architecture}_b5_custom.py",
+                        # It's intended that <=b4 refers to b5 config
+                        "mitb4": f"_base_/models/{architecture}_b5_custom.py",
+                        "mitb3": f"_base_/models/{architecture}_b5_custom.py",
+                        "mitb2": f"_base_/models/{architecture}_b5_custom.py",
+                        "mitb1": f"_base_/models/{architecture}_b1.py",
+                        "mitb0": f"_base_/models/{architecture}_b0_custom.py",
+                    }[backbone_]
         ```
         - `custom`, `adpt` 키워드를 통해 model config 파일 선택하여 리턴
         - adapter half, full 각각 adpt1, adpt2로 표기함
 
+* backbone freezing 과정 모델 클래스 안으로 집어넣기
+    - `mmseg/models/uda/dacs_custom.py`
+        ```
+        if cfg["freeze_backbone"]:
+            from mmseg.models.utils import freeze #!DEBUG
+            freeze(self.model.backbone)
+            freeze(self.ema_model.backbone)
+        ```
+    - 근데 MixTransformer 클래스 안에 `freeze_or_not_modules`라는 함수가 있으니 참고해서 활용하면 좋을것 같음
+
+
+# 240113
+## Todo
+* freeze, unfreeze(keyword) 형태로 변경하기
+* ViT adapter 붙이기
+
 ## additional CNN network
-* 
-    - git log number: 12fe661bd9c4bdd233546a9b2043b2413f21561a
+* ViT-Adapter 붙이기
+    - 차원이 도대체 어떻게 생겨먹은건지...
+        ```
+        embed_dims:
+            [64, 128, 320, 512]
+        x = query :
+            [1, 128, 64, 64]
+        deform_inputs1:
+            [
+                [1, 1024, 1, 2]
+                [3, 2]
+                [3]
+            ]
+        c:
+            [1, 5376, 320]
+        ```
+    - freeze 함수에 stem, injector도 제외할 수 있도록 변경
+        ```
+        def freeze(module: nn.Module, *submodules: List[str]):
+            for param in module.parameters():
+                param.requires_grad_(False)
+                param.grad = None
+
+            for name, param in module.named_parameters():
+                flags = [(x in name) for x in ["adapter", "stem", "injector"]]
+                if sum(flags) == 0: continue
+                param.requires_grad_(True)
+                # param.grad = None
+        ```
+    - SegFormer에 cross attention 구현이 안돼있어서 지금 굉장히 곤란함...
+
+        c = torch.cat([c2, c3, c4], dim=1)      -> c: 1, 5376, 320
+
+        x, H, W = self.patch_embed1(x)          -> x: 1, 16384, 64
+                                                -> H, W: 128, 128
+
+        x, H, W = self.patch_embed2(x)          -> x: 1, 4096, 128
+                                                -> H, W: 64, 64
+
+        x, H, W = self.patch_embed3(x)          -> x: 1, 1024, 320
+                                                -> H, W: 32, 32
+
+        <!-- self.injector(query=inj_x, feat=c, H=H, W=W)        -> inj_x: 1, 4096, 128
+                                                            -> H, W: 32, 32
+                                                            -> x: 1, 1024, 320
+        이때 output : 1, 4096, 128 -->
+        self.injector(query=x, feat=c, H=H, W=W)    -> x: 1, 1024, 320
+                                                    -> c: 1, 5376, 320
+                                                    -> H, W: 32, 32
+        이때 output: 1, 1024, 320
+
+        self.attn(query, feat, H, W)
+    - 일단 SegFormer에 구현되어있는 self attention의 k, v 밸류만 별도로 받을 수 있게 하여 cross attention 구현함
+    - 돌돌 돌기는 함
+        - 실험 serial: `240113_2349_cs2rain_dacs_online_rcs001_cpl_segformer_mitb3_custom_adpt3_fixed_s0_35234`
+    - `adpt3`: adapter full + vit adapter (stem, injector)
+
+
+# 240114
+## Todo
+* 0, 1 블록에서 MLP adapter 삭제하기
+* back propagation이 aux_classifier 부분으로만 되도록 하기
+* cross attention이 똑바로 구현되어있는지 검증하기
+* 현재 block2로 연결되도록 구현되어있는데, granularity 문제가 없는지 확인하기
+
+
 
 
