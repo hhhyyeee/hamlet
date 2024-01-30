@@ -641,13 +641,102 @@ or (
     - `adpt3`: adapter full + vit adapter (stem, injector)
 
 
-# 240114
+# 240116
 ## Todo
 * 0, 1 블록에서 MLP adapter 삭제하기
 * back propagation이 aux_classifier 부분으로만 되도록 하기
 * cross attention이 똑바로 구현되어있는지 검증하기
 * 현재 block2로 연결되도록 구현되어있는데, granularity 문제가 없는지 확인하기
 
+## indexing으로 MLP adapter 붙일 수 있도록 변경
+    - `mmseg/models/backbones/mix_transformer_adapter_auxclf.py`
+        ```
+            def create_pets_mit():
+                ...
+                if self.pet_cls == "Adapter":
+                    adapter_list_list = []
+                    for idx, (_block_idx, embed_dim) in enumerate(zip(self.adapt_blocks, embed_dims)):
+                        adapter_list = []
+                        for _ in range(depths[_block_idx]):
+                            kwargs = dict(**self.pet_kwargs)
+                            kwargs["embed_dim"] = embed_dim
+                            # adapter_list.append(Adapter(**kwargs))
+                            adapter_list.append(Adapter(**kwargs))
+                        adapter_list_list.append(nn.ModuleList(adapter_list))
+                    return adapter_list_list
+        ```
+        ```
+        def attach_pets_mit(self):
+            ...
+                pets = self.pets
+                if self.pet_cls == "Adapter":
+                    for _idx, (_dim_idx, _dim) in enumerate(zip(self.adapt_blocks, self.embed_dims_adapter)):
+                    # for _dim_idx, _dim in enumerate(self.embed_dims_adapter):
+                        for _depth_idx in range(self.depths[_dim_idx]):
+                            eval(f"self.block{_dim_idx + 1}")[_depth_idx].attach_adapter(mlp=pets[_idx][_depth_idx])
+                    return
+        ```
+        - 문제가 생긴 것은 무조건 enumerate로 참조하는 adapt blocks dim과 depth dim 때문이었음
+        - 따라서 전체적으로 self.adapt_blocks를 꺼내서 참조할 수 있도록 하여 인덱싱으로 변경함
+    - git log number: f4832c93a3c748fa451b0ac4c2bac002df1c05e6
+    - 실험
+        - mit b3: `240116_1601_cs2rain_dacs_online_rcs001_cpl_segformer_mitb3_custom_adpt3_fixed_s0_28ef5`
+        - mit b1: `240116_1602_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt3_fixed_s0_ddc3f`
+    - 둘다 NoneType 에러가 나서 다시 실험
+        - mit b3: `240118_1205_cs2rain_dacs_online_rcs001_cpl_segformer_mitb3_custom_adpt3_fixed_s0_c0431`
+        - mit b1: `240118_1209_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt3_fixed_s0_f6530`
+
+
+# 240118
+## Todo
+
+## 새로 구현한 아키텍처 # of params 세어보기
+* `tools/get_param_count.py`
+    ```
+    def count_parameters(model):
+        table = PrettyTable(['Modules', 'Parameters'])
+        total_params = 0
+        for name, parameter in model.named_parameters():
+            # if not parameter.requires_grad:               <- 요 2라인 주석처리하면 freeze된 파라미터 개수까지 세서 표로 표현해줌
+            #     continue
+            param = parameter.numel()
+            table.add_row([name, human_format(param)])
+            total_params += param
+        print(table)
+        print(f'Total Trainable Params: {human_format(total_params)}')
+        return total_params
+    ```
+* 개수 세어보기
+    - 스프레드시트 (https://docs.google.com/spreadsheets/d/1_OYJt46E9OlgUmLUa5fA-vvDOt3IZi1BH3UDfKJN-IQ/edit#gid=515108745) 5, 6번 실험 참조
+    - 막상 파라미터 개수를 세어보니 cross attention으로 구현한 stem + injector 구조가 너무 무거워졌음
+    - Injector의 새로 구현한 cross attention 때문인듯
+        - 스프레드시트 (https://docs.google.com/spreadsheets/d/1_OYJt46E9OlgUmLUa5fA-vvDOt3IZi1BH3UDfKJN-IQ/edit#gid=69047162)
+
+
+# 240129
+## CUDA: illegal memory access (continued)
+
+트러블슈팅 노션 링크: https://marbled-raptorex-e94.notion.site/31b0caecd79e45fcb4f3cd8331440a77?pvs=4
+
+왜 이딴 에러가?
+지난주에는 torch version이 안맞아서 생기는 에러인줄 알고 삽질을 엄청 했지만 사실 아닌 거 같다?
+backprop에서 에러가 나는거보니 뭔가 그래프가 이상하게 만들어졌나보다?
+
+
+# 240130
+## CUDA: illegal memory access (continued)
+똑같은 문제로 계속 헤매는중 ㅠㅠ
+여러가지 속상한 일들이 많았음
+최종적으로는 mmcv의 ops.MultiScaleDeformableAttention 모듈을 사용하기로 결정함
+
+* `mmseg/__init__.py`
+    ```
+    MMCV_MIN = '1.3.7'
+    # MMCV_MAX = '1.4.0'
+    MMCV_MAX = '1.7.3'
+    ```
+    - ops.MultiScaleDeformableAttention를 사용하기 위해서는 높은 버전의 mmcv를 사용해야 하는데 mmcv 1.4.0에서는 지원하지 않았음
+    - 문제가 발생하기 전까지 mmcv 1.7.2를 사용하기로 결정
 
 
 

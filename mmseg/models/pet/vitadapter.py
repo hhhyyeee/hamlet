@@ -10,6 +10,9 @@ import torch.utils.checkpoint as cp
 from mmseg.models.pet.ms_deform_attn import MSDeformAttn
 from timm.models.layers import DropPath
 
+from mmcv.cnn.bricks.transformer import build_attention
+from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformableAttention
+
 _logger = logging.getLogger(__name__)
 
 
@@ -48,78 +51,6 @@ def deform_inputs(x):
     deform_inputs2 = [reference_points, spatial_shapes, level_start_index]
     
     return deform_inputs1, deform_inputs2
-
-
-class CrossAttention(nn.Module):
-    def __init__(self,
-                 dim,
-                 num_heads=8,
-                 qkv_bias=False,
-                 qk_scale=None,
-                 attn_drop=0.,
-                 proj_drop=0.,
-                 sr_ratio=1):
-        super().__init__()
-        assert dim % num_heads == 0, f'dim {dim} should be divided by ' \
-                                     f'num_heads {num_heads}.'
-
-        self.dim = dim                              #512
-        self.num_heads = num_heads                  #8
-        head_dim = dim // num_heads                 #64
-        self.scale = qk_scale or head_dim**-0.5     #8
-
-        self.q = nn.Linear(dim, dim, bias=qkv_bias)
-        self.kv = nn.Linear(dim, dim * 2, bias=qkv_bias)
-        self.attn_drop = nn.Dropout(attn_drop)
-        self.proj = nn.Linear(dim, dim)
-        self.proj_drop = nn.Dropout(proj_drop)
-
-        self.sr_ratio = sr_ratio
-        if sr_ratio > 1:
-            self.sr = nn.Conv2d(
-                dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
-            self.norm = nn.LayerNorm(dim)
-
-    # def forward(self, x, H, W):
-    def forward(self, query, feat, H, W):
-        """
-        query: Transformer-originated
-        feat: Stem-originated
-        """
-        B, N, C = query.shape
-        q = self.q(query).reshape(B, N, self.num_heads,
-                                  C // self.num_heads).permute(0, 2, 1,
-                                                               3).contiguous()
-
-        a=1 # sr_ratio는 어디에 쓰는거지?
-        if self.sr_ratio > 1:
-            x_ = x.permute(0, 2, 1).contiguous().reshape(B, C, H, W)
-            x_ = self.sr(x_).reshape(B, C, -1).permute(0, 2, 1).contiguous()
-            x_ = self.norm(x_)
-            kv = self.kv(x_).reshape(B, -1, 2, self.num_heads,
-                                     C // self.num_heads).permute(
-                                         2, 0, 3, 1, 4).contiguous()
-        else:
-            # kv = self.kv(x).reshape(B, -1, 2, self.num_heads,
-            #                         C // self.num_heads).permute(
-            #                             2, 0, 3, 1, 4).contiguous()
-            kv = self.kv(feat).reshape(B, -1, 2, self.num_heads,
-                                       C // self.num_heads).permute(
-                                           2, 0, 3, 1, 4).contiguous()
-
-        a=1
-        k, v = kv[0], kv[1]
-
-        attn = (q @ k.transpose(-2, -1).contiguous()) * self.scale
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-
-        x = (attn @ v).transpose(1, 2).contiguous().reshape(B, N, C)
-        x = self.proj(x)
-        x = self.proj_drop(x)
-
-        return x
-
 
 
 class ConvFFN(nn.Module):
@@ -199,25 +130,30 @@ class Extractor(nn.Module):
         return query
 
 
-class OrigInjector(nn.Module):
+class Injector(nn.Module):
+    """240130 ver.
+    """
     def __init__(self, dim, num_heads=6, n_points=4, n_levels=1, deform_ratio=1.0,
                  norm_layer=partial(nn.LayerNorm, eps=1e-6), init_values=0., with_cp=False):
         super().__init__()
         self.with_cp = with_cp
         self.query_norm = norm_layer(dim)
         self.feat_norm = norm_layer(dim)
-        self.attn = MSDeformAttn(d_model=dim, n_levels=n_levels, n_heads=num_heads,
-                                 n_points=n_points, ratio=deform_ratio)
+        self.attn = MultiScaleDeformableAttention(embed_dims=dim,
+                                                  num_heads=num_heads,
+                                                  num_levels=n_levels,
+                                                  batch_first=True)
         self.gamma = nn.Parameter(init_values * torch.ones((dim)), requires_grad=True)
 
     def forward(self, query, reference_points, feat, spatial_shapes, level_start_index):
-        
-        a=1
         def _inner_forward(query, feat):
 
-            attn = self.attn(self.query_norm(query), reference_points,
-                             self.feat_norm(feat), spatial_shapes,
-                             level_start_index, None)
+            attn = self.attn(self.query_norm(query),
+                             self.feat_norm(feat),
+                             self.feat_norm(feat),
+                             reference_points=reference_points,
+                             spatial_shapes=spatial_shapes,
+                             level_start_index=level_start_index)
             return query + self.gamma * attn
         
         if self.with_cp and query.requires_grad:
@@ -226,34 +162,6 @@ class OrigInjector(nn.Module):
             query = _inner_forward(query, feat)
             
         return query
-
-
-class Injector(nn.Module):
-    def __init__(self, dim, num_heads=6, n_points=4, n_levels=1, deform_ratio=1.0,
-                 norm_layer=partial(nn.LayerNorm, eps=1e-6), init_values=0., with_cp=False):
-        super().__init__()
-        self.with_cp = with_cp
-        self.query_norm = norm_layer(dim)
-        self.feat_norm = norm_layer(dim)
-        self.attn = CrossAttention(dim=dim, num_heads=num_heads)
-        self.gamma = nn.Parameter(init_values * torch.ones((dim)), requires_grad=True)
-
-    def forward(self, query, feat, H, W):
-
-        def _inner_forward(query, feat):
-            attn = self.attn(query, feat, H, W)
-            # attn = self.attn(self.query_norm(query), reference_points,
-            #                  self.feat_norm(feat), spatial_shapes,
-            #                  level_start_index, None)
-            return query + self.gamma * attn
-        
-        if self.with_cp and query.requires_grad:
-            query = cp.checkpoint(_inner_forward, query, feat)
-        else:
-            query = _inner_forward(query, feat)
-            
-        return query
-
 
 
 class InteractionBlock(nn.Module):
@@ -398,3 +306,130 @@ class SpatialPriorModule(nn.Module):
         else:
             outs = _inner_forward(x)
         return outs
+
+
+# ----- deprecated (2312??) -----
+class CrossAttention(nn.Module):
+    def __init__(self,
+                 dim,
+                 num_heads=8,
+                 qkv_bias=False,
+                 qk_scale=None,
+                 attn_drop=0.,
+                 proj_drop=0.,
+                 sr_ratio=1):
+        super().__init__()
+        assert dim % num_heads == 0, f'dim {dim} should be divided by ' \
+                                     f'num_heads {num_heads}.'
+
+        self.dim = dim                              #512
+        self.num_heads = num_heads                  #8
+        head_dim = dim // num_heads                 #64
+        self.scale = qk_scale or head_dim**-0.5     #8
+
+        self.q = nn.Linear(dim, dim, bias=qkv_bias)
+        self.kv = nn.Linear(dim, dim * 2, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+        self.sr_ratio = sr_ratio
+        if sr_ratio > 1:
+            self.sr = nn.Conv2d(
+                dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
+            self.norm = nn.LayerNorm(dim)
+
+    def forward(self, query, feat, H, W):
+        """
+        query: Transformer-originated
+        feat: Stem-originated
+        """
+        B, N, C = query.shape
+        q = self.q(query).reshape(B, N, self.num_heads,
+                                  C // self.num_heads).permute(0, 2, 1,
+                                                               3).contiguous()
+
+        a=1 # sr_ratio는 어디에 쓰는거지?
+        if self.sr_ratio > 1:
+            x_ = x.permute(0, 2, 1).contiguous().reshape(B, C, H, W)
+            x_ = self.sr(x_).reshape(B, C, -1).permute(0, 2, 1).contiguous()
+            x_ = self.norm(x_)
+            kv = self.kv(x_).reshape(B, -1, 2, self.num_heads,
+                                     C // self.num_heads).permute(
+                                         2, 0, 3, 1, 4).contiguous()
+        else:
+            # kv = self.kv(x).reshape(B, -1, 2, self.num_heads,
+            #                         C // self.num_heads).permute(
+            #                             2, 0, 3, 1, 4).contiguous()
+            kv = self.kv(feat).reshape(B, -1, 2, self.num_heads,
+                                       C // self.num_heads).permute(
+                                           2, 0, 3, 1, 4).contiguous()
+
+        k, v = kv[0], kv[1]
+
+        attn = (q @ k.transpose(-2, -1).contiguous()) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+
+        x = (attn @ v).transpose(1, 2).contiguous().reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+
+        return x
+
+
+# ----- deprecated (240130) -----
+class OrigInjector(nn.Module):
+    def __init__(self, dim, num_heads=6, n_points=4, n_levels=1, deform_ratio=1.0,
+                 norm_layer=partial(nn.LayerNorm, eps=1e-6), init_values=0., with_cp=False):
+        super().__init__()
+        self.with_cp = with_cp
+        self.query_norm = norm_layer(dim)
+        self.feat_norm = norm_layer(dim)
+        self.attn = MSDeformAttn(d_model=dim, n_levels=n_levels, n_heads=num_heads,
+                                 n_points=n_points, ratio=deform_ratio)
+        self.gamma = nn.Parameter(init_values * torch.ones((dim)), requires_grad=True)
+
+    def forward(self, query, reference_points, feat, spatial_shapes, level_start_index):
+        
+        a=1
+        def _inner_forward(query, feat):
+
+            attn = self.attn(self.query_norm(query), reference_points,
+                             self.feat_norm(feat), spatial_shapes,
+                             level_start_index, None)
+            return query + self.gamma * attn
+        
+        if self.with_cp and query.requires_grad:
+            query = cp.checkpoint(_inner_forward, query, feat)
+        else:
+            query = _inner_forward(query, feat)
+            
+        return query
+
+class Injector_1(nn.Module):
+    def __init__(self, dim, num_heads=6, n_points=4, n_levels=1, deform_ratio=1.0,
+                    norm_layer=partial(nn.LayerNorm, eps=1e-6), init_values=0., with_cp=False):
+        super().__init__()
+        self.with_cp = with_cp
+        self.query_norm = norm_layer(dim)
+        self.feat_norm = norm_layer(dim)
+        self.attn = CrossAttention(dim=dim, num_heads=num_heads)
+        self.gamma = nn.Parameter(init_values * torch.ones((dim)), requires_grad=True)
+
+    def forward(self, query, feat, H, W):
+
+        def _inner_forward(query, feat):
+            attn = self.attn(query, feat, H, W)
+            # attn = self.attn(self.query_norm(query), reference_points,
+            #                  self.feat_norm(feat), spatial_shapes,
+            #                  level_start_index, None)
+            return query + self.gamma * attn
+        
+        if self.with_cp and query.requires_grad:
+            query = cp.checkpoint(_inner_forward, query, feat)
+        else:
+            query = _inner_forward(query, feat)
+            
+        return query
+

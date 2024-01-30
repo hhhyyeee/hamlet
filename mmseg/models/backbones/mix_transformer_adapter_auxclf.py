@@ -23,7 +23,7 @@ from mmseg.utils import get_root_logger
 
 import timm
 
-from mmseg.models.pet.vitadapter import SpatialPriorModule, Injector, deform_inputs
+from mmseg.models.pet.vitadapter import SpatialPriorModule, OrigInjector, Injector, deform_inputs
 from torch.nn.init import normal_
 
 class Mlp(nn.Module):
@@ -256,11 +256,12 @@ class MixVisionTransformer(BaseModule):
         self.clf_flag = cfg["aux_classifier"]
         if self.clf_flag:
             a=1
+            _embed_dim = embed_dims[2]
             # vit_adapter_embed_dim = embed_dims[1] #(64, 128, 320, 512)
-            self.stem = SpatialPriorModule(embed_dim=embed_dims[2])
-            self.injector = Injector(dim=embed_dims[2], num_heads=8)
+            self.stem = SpatialPriorModule(embed_dim=_embed_dim)
+            self.injector = Injector(dim=_embed_dim, num_heads=8, n_levels=3) #embed_dims[2]가 320인데 320/8=40으로 딱 떨어질 수 있도록 num_heads 설정
 
-            self.level_embed = nn.Parameter(torch.zeros(3, embed_dims[2]))
+            self.level_embed = nn.Parameter(torch.zeros(3, _embed_dim))
             normal_(self.level_embed)
 
         # patch_embed
@@ -499,15 +500,19 @@ class MixVisionTransformer(BaseModule):
 
         a=1
         # stage 0: clone input x
-        _x  = x.detach().clone()
 
-        # c1, c2, c3, c4 = self.spm(x)
-        c1, c2, c3, c4 = self.stem(_x)
+        # === stem 입력으로 _x라는 클론 텐서를 넣기 위한 몸부림... 하지만 실패
+        # _x = x.detach().clone()
+        # _x = torch.Tensor.new_tensor(x, requires_grad=True)
+        # _x = torch.tensor(x)
+        # === 그냥 x를 넣어보자...
+
+        c1, c2, c3, c4 = self.stem(x) # c3 사용시 backprop 문제없이 됨 -> 문제없을듯
         c2, c3, c4 = self._add_level_embed(c2, c3, c4)
         c = torch.cat([c2, c3, c4], dim=1)
+        a=1
 
-        # deform_inputs1, deform_inputs2 = deform_inputs(_x)
-        # _x = x.copy() # deepcopy?
+        deform_inputs1, deform_inputs2 = deform_inputs(x)
         B = x.shape[0]
         outs = []
 
@@ -525,23 +530,26 @@ class MixVisionTransformer(BaseModule):
         for i, blk in enumerate(self.block2):
             x = blk(x, H, W)
         x = self.norm2(x)
-        inj_x = x.detach().clone()
+        # inj_x = x.detach().clone()
         x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
         outs.append(x)
 
         # stage 1-2: aux_clf (STEM?)
         a=1
-        # _x = self.stem(_x)
-        # _x = self.aux_clf(self.aux_clf_transforms(_x).unsqueeze(0))
 
         # block 3
         x, H, W = self.patch_embed3(x)
+        # inj_x = x.detach().clone()
+        # inj_x = torch.Tensor(inj_x, requires_grad=True)
+        # inj_x = torch.tensor(x)
 
         # (+) stage 1-3: fusion (INJECTOR?)
         a=1
-        x = self.injector(query=x, feat=c, H=H, W=W)
-        # x = self.injector(query=inj_x, reference_points=deform_inputs1[0], feat=c,
-        #                   spatial_shapes=deform_inputs1[1], level_start_index=deform_inputs1[2])
+        # x = self.injector(query=x, feat=c, H=H, W=W)
+        x = self.injector(query=x, reference_points=deform_inputs1[0], feat=c,
+                          spatial_shapes=deform_inputs1[1], level_start_index=deform_inputs1[2])
+
+        x = x + c3 #!DEBUG
 
         for i, blk in enumerate(self.block3):
             x = blk(x, H, W)
