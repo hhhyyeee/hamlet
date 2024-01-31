@@ -549,7 +549,7 @@ class MixVisionTransformer(BaseModule):
         x = self.injector(query=x, reference_points=deform_inputs1[0], feat=c,
                           spatial_shapes=deform_inputs1[1], level_start_index=deform_inputs1[2])
 
-        x = x + c3 #!DEBUG
+        # x = x + c3 #!DEBUG
 
         for i, blk in enumerate(self.block3):
             x = blk(x, H, W)
@@ -746,4 +746,3 @@ class mit_b5(MixVisionTransformer):
             depths=[3, 6, 40, 3],
             sr_ratios=[8, 4, 2, 1],
             **kwargs)
-        a=1
