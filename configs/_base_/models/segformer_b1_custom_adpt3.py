@@ -8,16 +8,17 @@ norm_cfg = dict(type='BN', requires_grad=True)
 find_unused_parameters = True
 model = dict(
     type='OthersEncoderDecoder',
-    pretrained='pretrained/mit_b0.pth',
+    pretrained='pretrained/mit_b1.pth',
     backbone=dict(
-        type='mit_b0',
+        type='mit_b1',
         style='pytorch',
         pet_cls='Adapter',
-        adapt_blocks=[0, 1]
+        adapt_blocks=[2, 3],
+        aux_classifier=True
         ),
     decode_head=dict(
         type='OriginalSegFormerHead',
-        in_channels=[32, 64, 160, 256],
+        in_channels=[64, 128, 320, 512],
         in_index=[0, 1, 2, 3],
         channels=128,
         dropout_ratio=0.1,
