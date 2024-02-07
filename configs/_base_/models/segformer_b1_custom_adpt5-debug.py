@@ -14,7 +14,7 @@ model = dict(
         style='pytorch',
         pet_cls='Adapter',
         adapt_blocks=[0, 1, 2, 3],
-        aux_classifier=True
+        aux_classifier=False
         ),
     decode_head=dict(
         type='OriginalSegFormerHead',
@@ -25,7 +25,7 @@ model = dict(
         num_classes=19,
         norm_cfg=norm_cfg,
         align_corners=False,
-        decoder_params=dict(embed_dim=256, conv_kernel_size=1),
+        decoder_params=dict(embed_dim=768, conv_kernel_size=1),
         loss_decode=dict(
             type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)),
     # model training and testing settings

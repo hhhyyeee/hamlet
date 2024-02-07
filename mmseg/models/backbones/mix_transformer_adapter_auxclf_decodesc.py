@@ -263,6 +263,10 @@ class MixVisionTransformer(BaseModule):
 
             self.level_embed = nn.Parameter(torch.zeros(3, _embed_dim))
             normal_(self.level_embed)
+        
+        # --- custom decoder
+        self.decoder_custom = "decoder_custom" in cfg
+        a=1
 
         # patch_embed
         self.patch_embed1 = OverlapPatchEmbed(
@@ -566,10 +570,68 @@ class MixVisionTransformer(BaseModule):
         outs.append(x)
 
         return outs
+ 
+
+    def forward_features_ordered(self, x):
+        # if not self.clf_flag:
+        #     return self.forward_features_orig(x, modules=[1, 2, 3, 4])
+
+        # stage 0: aux_clf feature extract
+        c1, c2, c3, c4 = self.stem(x) # c3 사용시 backprop 문제없이 됨 -> 문제없을듯
+        c2, c3, c4 = self._add_level_embed(c2, c3, c4)
+        c = torch.cat([c2, c3, c4], dim=1)
+
+        deform_inputs1, deform_inputs2 = deform_inputs(x)
+        B = x.shape[0]
+        outs = []
+
+        # stage 1-1: MiT block 1~2
+        # block 1
+        x, H, W = self.patch_embed1(x)
+        for i, blk in enumerate(self.block1):
+            x = blk(x, H, W)
+        x = self.norm1(x)
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+
+        # block 2
+        x, H, W = self.patch_embed2(x)
+        for i, blk in enumerate(self.block2):
+            x = blk(x, H, W)
+        x = self.norm2(x)
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+
+        # block 3
+        x, H, W = self.patch_embed3(x)
+
+        # (+) stage 1-3: fusion (INJECTOR?)
+        x = self.injector(query=x, reference_points=deform_inputs1[0], feat=c,
+                          spatial_shapes=deform_inputs1[1], level_start_index=deform_inputs1[2])
+
+        for i, blk in enumerate(self.block3):
+            x = blk(x, H, W)
+        x = self.norm3(x)
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+
+        # block 4
+        x, H, W = self.patch_embed4(x)
+        for i, blk in enumerate(self.block4):
+            x = blk(x, H, W)
+        x = self.norm4(x)
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+
+        return outs, (c1, c2, c3, c4, c)
+
 
     def forward(self, x, module=4):
         modules = range(1, module + 1)
-        x = self.forward_features(x)
+        if self.decoder_custom:
+            x = self.forward_features_ordered(x)
+        else:
+            x = self.forward_features(x)
         a=1
         # x = self.head(x)
 

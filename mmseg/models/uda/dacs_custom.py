@@ -114,13 +114,12 @@ class DACS(CustomUDADecorator):
 
         self.dacs_ratio = self.fixed_dacs = 0.5
         self.use_domain_indicator = cfg["use_domain_indicator"]
-
+ 
         a=1
         if cfg["freeze_backbone"]:
             from mmseg.models.utils import freeze #!DEBUG
             freeze(self.model.backbone)
             freeze(self.ema_model.backbone)
-            a=1
 
     def get_ema_model(self):
         return get_module(self.ema_model)
