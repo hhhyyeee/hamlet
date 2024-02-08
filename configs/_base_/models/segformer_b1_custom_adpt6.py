@@ -8,10 +8,13 @@ norm_cfg = dict(type='BN', requires_grad=True)
 find_unused_parameters = True
 model = dict(
     type='OthersEncoderDecoder',
-    pretrained='pretrained/mit_b5.pth',
+    pretrained='pretrained/mit_b1.pth',
     backbone=dict(
-        type='mit_b5',
+        type='mit_b1',
         style='pytorch',
+        pet_cls='Adapter',
+        adapt_blocks=[2, 3],
+        aux_classifier=True
         ),
     decode_head=dict(
         type='OriginalSegFormerHead',

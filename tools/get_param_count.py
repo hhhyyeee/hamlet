@@ -30,7 +30,7 @@ def count_parameters(model):
         param = parameter.numel()
         table.add_row([name, human_format(param)])
         total_params += param
-    #print(table)
+    print(table)
     print(f'Total Trainable Params: {human_format(total_params)}')
     return total_params
 

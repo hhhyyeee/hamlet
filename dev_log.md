@@ -254,7 +254,6 @@ or (
         if cfg["freeze_backbone"]: #!DEBUG
             for param in model.model.backbone.parameters():
                 param.requires_grad = False
-
         ```
 
 * OthersEncoderDecoder 활용시 EvalHook에서 제대로된 스코어 출력하도록 구현
@@ -335,10 +334,9 @@ or (
 * Decoder Head도 pretrained weights 붙일 수 있게 하기
 
 * Static Teacher 없애버리기
-    -  `configs/_base_/uda/dacs_a999_fdthings.py` 에서 imnet_feature_dist_lambda를 0으로 설정하면 imnet_head 뺄수있음
+    - `configs/_base_/uda/dacs_a999_fdthings.py` 에서 imnet_feature_dist_lambda를 0으로 설정하면 imnet_head 뺄수있음
     - 근데 이 옵션이 구현은 안돼있음 개뿍침
-
-
+    - 구현함
 
 
 # 231203
@@ -355,47 +353,47 @@ or (
 * `mmseg/core/evaluation/eval_hooks.py`
     - show_result 옵션 끄기
         ```
-            from mmseg.apis import single_gpu_test
+        from mmseg.apis import single_gpu_test
 
-            for dataloader in self.dataloaders:
-                dataset_name = dataloader.dataset.name
-                results = single_gpu_test(
-                    runner.model,
-                    dataloader,
-                    # show=True,
-                    show=False,
-                    # out_dir=self.work_dir,
-                    out_dir=None,
-                    num_epoch=runner.iter,
-                    dataset_name=dataset_name,
-                    img_to_pred=self.img_to_pred,
-                    efficient_test=self.efficient_test,
-                )
-                self.evaluate(dataloader, runner, results, dataset_name)
-                # ugly way to ensure ram does not crash having multiple val datasets
-                gc.collect()
+        for dataloader in self.dataloaders:
+            dataset_name = dataloader.dataset.name
+            results = single_gpu_test(
+                runner.model,
+                dataloader,
+                # show=True,
+                show=False,
+                # out_dir=self.work_dir,
+                out_dir=None,
+                num_epoch=runner.iter,
+                dataset_name=dataset_name,
+                img_to_pred=self.img_to_pred,
+                efficient_test=self.efficient_test,
+            )
+            self.evaluate(dataloader, runner, results, dataset_name)
+            # ugly way to ensure ram does not crash having multiple val datasets
+            gc.collect()
         ```
 * `mmseg/apis/train.py`
     - test time batch size 8->1
         ```
-            # register eval hooks
-            if validate:
-                samples = 1
-                # samples = 8 #!DEBUG
-                if "online" in cfg:
-                    val_datasets = [build_dataset(val) for val in cfg.online.val]
-                    val_dataloader = [
-                        build_dataloader(
-                            ds,
-                            samples_per_gpu=samples,
-                            workers_per_gpu=cfg.data.workers_per_gpu,
-                            dist=distributed,
-                            shuffle=False,
-                        )
-                        for ds in val_datasets
-                    ]
-                    eval_hook = OnlineEvalHook
-                    eval_hook = eval_hook if "video" not in cfg["mode"] else VideoEvalHook
+        # register eval hooks
+        if validate:
+            samples = 1
+            # samples = 8 #!DEBUG
+            if "online" in cfg:
+                val_datasets = [build_dataset(val) for val in cfg.online.val]
+                val_dataloader = [
+                    build_dataloader(
+                        ds,
+                        samples_per_gpu=samples,
+                        workers_per_gpu=cfg.data.workers_per_gpu,
+                        dist=distributed,
+                        shuffle=False,
+                    )
+                    for ds in val_datasets
+                ]
+                eval_hook = OnlineEvalHook
+                eval_hook = eval_hook if "video" not in cfg["mode"] else VideoEvalHook
         ```
 
 * Genetic Algorithm을 사용할 hyperparameter tuning 실험 설계
@@ -406,43 +404,339 @@ or (
 * `mmseg/core/evaluation/eval_hooks.py`
     - DEBUG 모드에만 pred 디렉토리 출력하도록 변경
         ```
-            def _do_evaluate(self, runner):
-                """perform evaluation and save ckpt."""
-                if not self._should_evaluate(runner):
-                    return
+        def _do_evaluate(self, runner):
+            """perform evaluation and save ckpt."""
+            if not self._should_evaluate(runner):
+                return
 
-                self.first = False
-                from mmseg.apis import single_gpu_test
+            self.first = False
+            from mmseg.apis import single_gpu_test
 
-                from run_experiments import DEBUG
-                show = False
-                out_dir = None
-                if DEBUG:
-                    show = True
-                    out_dir = self.out_dir
+            from run_experiments import DEBUG
+            show = False
+            out_dir = None
+            if DEBUG:
+                show = True
+                out_dir = self.out_dir
 
-                for dataloader in self.dataloaders:
-                    dataset_name = dataloader.dataset.name
-                    results = single_gpu_test(
-                        runner.model,
-                        dataloader,
-                        show=show,
-                        out_dir=out_dir,
-                        num_epoch=runner.iter,
-                        dataset_name=dataset_name,
-                        img_to_pred=self.img_to_pred,
-                        efficient_test=self.efficient_test,
-                    )
-                    self.evaluate(dataloader, runner, results, dataset_name)
-                    # ugly way to ensure ram does not crash having multiple val datasets
-                    gc.collect()
+            for dataloader in self.dataloaders:
+                dataset_name = dataloader.dataset.name
+                results = single_gpu_test(
+                    runner.model,
+                    dataloader,
+                    show=show,
+                    out_dir=out_dir,
+                    num_epoch=runner.iter,
+                    dataset_name=dataset_name,
+                    img_to_pred=self.img_to_pred,
+                    efficient_test=self.efficient_test,
+                )
+                self.evaluate(dataloader, runner, results, dataset_name)
+                # ugly way to ensure ram does not crash having multiple val datasets
+                gc.collect()
         ```
         - show=False, out_dir=None 일 때 pred 디렉토리 출력하지 않음
 
-* 
+
+# 231215
+## Todo
+* Swin Transformer backbone 붙이기
+* Teacher 선언시 adapter 안붙이고 완전히 freeze하게 할 수 있도록
+    - 옵션으로 구현?
+* Decoder Head도 pretrained weights 붙일 수 있게 하기
+    - Hamlet은 full ft였던거 같은데 정확히 모르겠음
+* EwC 모듈 구현
+
+## 구현 및 변경사항
+* `mmseg/models/backbones/mix_transformer_adapter.py` (231205?)
+    - PET 모듈 옵션 설정 시 hasattr 쓰면 제대로 동작 안해서 바꿈
+        - git log number: 4f6ceecd6bdc776089d45344ec4d6c890d255202
+        ```
+        # PET
+        a=1
+        # PET = hasattr(cfg, "adapt_blocks")
+        PET = "adapt_blocks" in cfg
+        if PET:
+            adapt_blocks = cfg["adapt_blocks"]
+            pet_cls = cfg["pet_cls"]
+            pet_kwargs = {"scale": None}
+
+            self.embed_dims_adapter = [_dim for idx, _dim in enumerate(embed_dims) if idx in adapt_blocks]
+        ```
 
 
+# 231215
+## 구현 및 변경사항
+* Decoder Head도 pretrained weights 붙일 수 있도록 변경
+    - toc serial: S00021
 
+## Todo
+* Swin Transformer backbone 붙이기
+* Teacher 선언시 adapter 안붙이고 완전히 freeze하게 할 수 있도록
+    - 옵션으로 구현?
+* EwC 모듈 구현
+
+
+# 231228
+## 구현 및 변경사항
+* MiT B0 custom 모드로 adapter 붙여서 사용할 수 있도록 변경
+    - git log number: e60c4a1d37eccd2957d64f1aca8f600991a9928d
+
+
+# 231229
+## line_profiler
+* backbone full ft vs. adapter w/ frozen backbone: 비교분석
+    - b3_noadapter_melt (=> total 87.5%)
+        - update_ema : 14.1%
+        - clean_losses = self.get_model().forward_train(...) (Train on source images) : 13.4%
+        - ema_logits = self.get_ema_model().encode_decode(...) (Generate pseudo-label) : 10.0%
+        - mix_losses = self.get_model().forward_train(...) (Train on mixed images) : 12.0%
+        - (?) confidence of the student of the target and simulate prediction : 9.5% -> 이거 뭔데 있지?
+        - (clean_loss + mix_loss).backward() : 28.5%
+        ```
+        Line #      Hits         Time  Per Hit   % Time  Line Contents
+            487      2975  427696063.7 143763.4     28.5              (clean_loss + mix_loss).backward()
+        ```
+
+    - b3_halfadapter_frozen (=> total 86.5%)
+        - update_ema : 16.2%
+        - clean_losses = self.get_model().forward_train(...) (Train on source images) : 14.6%
+        - ema_logits = self.get_ema_model().encode_decode(...) (Generate pseudo-label) : 11.2%
+        - mix_losses = self.get_model().forward_train(...) (Train on mixed images) : 13.4%
+        - (?) confidence of the student of the target and simulate prediction : 10.6%
+        - (clean_loss + mix_loss).backward() : 20.5%
+        ```
+        Line #      Hits         Time  Per Hit   % Time  Line Contents
+            487      2975  285331228.9  95909.7     20.5              (clean_loss + mix_loss).backward()
+        ```
+
+    - 의견
+        - 1회 backprop 하는데 걸리는 시간이 full ft는 143,763ns인데 비해 half adapter는 95,909ns로 half adapter가 66%나 된다
+        - learnable params 개수가 47M vs. 3M으로 약 16배 차이나는데도 불구하고 이럼... 왤까?
+
+
+# 240103
+
+## 연구미팅 정리
+* 작은 backbone 모델
+
+## 구현 및 변경사항
+* ema_model backbone도 freeze할 수 있도록 변경; optimizer가 model.module.model만 쳐다보도록 변경
+    - `mmseg/apis/train.py`
+        ```
+        if cfg["freeze_backbone"]: #!DEBUG
+            freeze(model.model.backbone)
+            freeze(model.ema_model.backbone)
+        ```
+        ```
+        # build runner
+        optimizer = build_optimizer(model.module.model, cfg.optimizer)
+        ```
+    - git log number: 12fe661bd9c4bdd233546a9b2043b2413f21561a
+
+* full/half adapter 여부 config에서 설정가능하도록 변경
+    - `experiments_custom.py`
+        ```
+        def get_model_base(architecture, backbone):
+            ...
+            if "custom" in backbone:        #!DEBUG
+                if "adpt" in backbone:      #!DEBUG
+                    backbone_, _, adapt = backbone.split("_")
+                    return {
+                        "mitb5": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                        # It's intended that <=b4 refers to b5 config
+                        "mitb4": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                        "mitb3": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                        "mitb2": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                        "mitb1": f"_base_/models/{architecture}_b1.py",
+                        "mitb0": f"_base_/models/{architecture}_b0_custom_{adapt}.py",
+                    }[backbone_]
+                else:
+                    backbone_, _ = backbone.split("_")
+                    return {
+                        "mitb5": f"_base_/models/{architecture}_b5_custom.py",
+                        # It's intended that <=b4 refers to b5 config
+                        "mitb4": f"_base_/models/{architecture}_b5_custom.py",
+                        "mitb3": f"_base_/models/{architecture}_b5_custom.py",
+                        "mitb2": f"_base_/models/{architecture}_b5_custom.py",
+                        "mitb1": f"_base_/models/{architecture}_b1.py",
+                        "mitb0": f"_base_/models/{architecture}_b0_custom.py",
+                    }[backbone_]
+        ```
+        - `custom`, `adpt` 키워드를 통해 model config 파일 선택하여 리턴
+        - adapter half, full 각각 adpt1, adpt2로 표기함
+
+* backbone freezing 과정 모델 클래스 안으로 집어넣기
+    - `mmseg/models/uda/dacs_custom.py`
+        ```
+        if cfg["freeze_backbone"]:
+            from mmseg.models.utils import freeze #!DEBUG
+            freeze(self.model.backbone)
+            freeze(self.ema_model.backbone)
+        ```
+    - 근데 MixTransformer 클래스 안에 `freeze_or_not_modules`라는 함수가 있으니 참고해서 활용하면 좋을것 같음
+
+
+# 240113
+## Todo
+* freeze, unfreeze(keyword) 형태로 변경하기
+* ViT adapter 붙이기
+
+## additional CNN network
+* ViT-Adapter 붙이기
+    - 차원이 도대체 어떻게 생겨먹은건지...
+        ```
+        embed_dims:
+            [64, 128, 320, 512]
+        x = query :
+            [1, 128, 64, 64]
+        deform_inputs1:
+            [
+                [1, 1024, 1, 2]
+                [3, 2]
+                [3]
+            ]
+        c:
+            [1, 5376, 320]
+        ```
+    - freeze 함수에 stem, injector도 제외할 수 있도록 변경
+        ```
+        def freeze(module: nn.Module, *submodules: List[str]):
+            for param in module.parameters():
+                param.requires_grad_(False)
+                param.grad = None
+
+            for name, param in module.named_parameters():
+                flags = [(x in name) for x in ["adapter", "stem", "injector"]]
+                if sum(flags) == 0: continue
+                param.requires_grad_(True)
+                # param.grad = None
+        ```
+    - SegFormer에 cross attention 구현이 안돼있어서 지금 굉장히 곤란함...
+
+        c = torch.cat([c2, c3, c4], dim=1)      -> c: 1, 5376, 320
+
+        x, H, W = self.patch_embed1(x)          -> x: 1, 16384, 64
+                                                -> H, W: 128, 128
+
+        x, H, W = self.patch_embed2(x)          -> x: 1, 4096, 128
+                                                -> H, W: 64, 64
+
+        x, H, W = self.patch_embed3(x)          -> x: 1, 1024, 320
+                                                -> H, W: 32, 32
+
+        <!-- self.injector(query=inj_x, feat=c, H=H, W=W)        -> inj_x: 1, 4096, 128
+                                                            -> H, W: 32, 32
+                                                            -> x: 1, 1024, 320
+        이때 output : 1, 4096, 128 -->
+        self.injector(query=x, feat=c, H=H, W=W)    -> x: 1, 1024, 320
+                                                    -> c: 1, 5376, 320
+                                                    -> H, W: 32, 32
+        이때 output: 1, 1024, 320
+
+        self.attn(query, feat, H, W)
+    - 일단 SegFormer에 구현되어있는 self attention의 k, v 밸류만 별도로 받을 수 있게 하여 cross attention 구현함
+    - 돌돌 돌기는 함
+        - 실험 serial: `240113_2349_cs2rain_dacs_online_rcs001_cpl_segformer_mitb3_custom_adpt3_fixed_s0_35234`
+    - `adpt3`: adapter full + vit adapter (stem, injector)
+
+
+# 240116
+## Todo
+* 0, 1 블록에서 MLP adapter 삭제하기
+* back propagation이 aux_classifier 부분으로만 되도록 하기
+* cross attention이 똑바로 구현되어있는지 검증하기
+* 현재 block2로 연결되도록 구현되어있는데, granularity 문제가 없는지 확인하기
+
+## indexing으로 MLP adapter 붙일 수 있도록 변경
+    - `mmseg/models/backbones/mix_transformer_adapter_auxclf.py`
+        ```
+            def create_pets_mit():
+                ...
+                if self.pet_cls == "Adapter":
+                    adapter_list_list = []
+                    for idx, (_block_idx, embed_dim) in enumerate(zip(self.adapt_blocks, embed_dims)):
+                        adapter_list = []
+                        for _ in range(depths[_block_idx]):
+                            kwargs = dict(**self.pet_kwargs)
+                            kwargs["embed_dim"] = embed_dim
+                            # adapter_list.append(Adapter(**kwargs))
+                            adapter_list.append(Adapter(**kwargs))
+                        adapter_list_list.append(nn.ModuleList(adapter_list))
+                    return adapter_list_list
+        ```
+        ```
+        def attach_pets_mit(self):
+            ...
+                pets = self.pets
+                if self.pet_cls == "Adapter":
+                    for _idx, (_dim_idx, _dim) in enumerate(zip(self.adapt_blocks, self.embed_dims_adapter)):
+                    # for _dim_idx, _dim in enumerate(self.embed_dims_adapter):
+                        for _depth_idx in range(self.depths[_dim_idx]):
+                            eval(f"self.block{_dim_idx + 1}")[_depth_idx].attach_adapter(mlp=pets[_idx][_depth_idx])
+                    return
+        ```
+        - 문제가 생긴 것은 무조건 enumerate로 참조하는 adapt blocks dim과 depth dim 때문이었음
+        - 따라서 전체적으로 self.adapt_blocks를 꺼내서 참조할 수 있도록 하여 인덱싱으로 변경함
+    - git log number: f4832c93a3c748fa451b0ac4c2bac002df1c05e6
+    - 실험
+        - mit b3: `240116_1601_cs2rain_dacs_online_rcs001_cpl_segformer_mitb3_custom_adpt3_fixed_s0_28ef5`
+        - mit b1: `240116_1602_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt3_fixed_s0_ddc3f`
+    - 둘다 NoneType 에러가 나서 다시 실험
+        - mit b3: `240118_1205_cs2rain_dacs_online_rcs001_cpl_segformer_mitb3_custom_adpt3_fixed_s0_c0431`
+        - mit b1: `240118_1209_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt3_fixed_s0_f6530`
+
+
+# 240118
+## Todo
+
+## 새로 구현한 아키텍처 # of params 세어보기
+* `tools/get_param_count.py`
+    ```
+    def count_parameters(model):
+        table = PrettyTable(['Modules', 'Parameters'])
+        total_params = 0
+        for name, parameter in model.named_parameters():
+            # if not parameter.requires_grad:               <- 요 2라인 주석처리하면 freeze된 파라미터 개수까지 세서 표로 표현해줌
+            #     continue
+            param = parameter.numel()
+            table.add_row([name, human_format(param)])
+            total_params += param
+        print(table)
+        print(f'Total Trainable Params: {human_format(total_params)}')
+        return total_params
+    ```
+* 개수 세어보기
+    - 스프레드시트 (https://docs.google.com/spreadsheets/d/1_OYJt46E9OlgUmLUa5fA-vvDOt3IZi1BH3UDfKJN-IQ/edit#gid=515108745) 5, 6번 실험 참조
+    - 막상 파라미터 개수를 세어보니 cross attention으로 구현한 stem + injector 구조가 너무 무거워졌음
+    - Injector의 새로 구현한 cross attention 때문인듯
+        - 스프레드시트 (https://docs.google.com/spreadsheets/d/1_OYJt46E9OlgUmLUa5fA-vvDOt3IZi1BH3UDfKJN-IQ/edit#gid=69047162)
+
+
+# 240129
+## CUDA: illegal memory access (continued)
+
+트러블슈팅 노션 링크: https://marbled-raptorex-e94.notion.site/31b0caecd79e45fcb4f3cd8331440a77?pvs=4
+
+왜 이딴 에러가?
+지난주에는 torch version이 안맞아서 생기는 에러인줄 알고 삽질을 엄청 했지만 사실 아닌 거 같다?
+backprop에서 에러가 나는거보니 뭔가 그래프가 이상하게 만들어졌나보다?
+
+
+# 240130
+## CUDA: illegal memory access (continued)
+똑같은 문제로 계속 헤매는중 ㅠㅠ
+여러가지 속상한 일들이 많았음
+최종적으로는 mmcv의 ops.MultiScaleDeformableAttention 모듈을 사용하기로 결정함
+
+* `mmseg/__init__.py`
+    ```
+    MMCV_MIN = '1.3.7'
+    # MMCV_MAX = '1.4.0'
+    MMCV_MAX = '1.7.3'
+    ```
+    - ops.MultiScaleDeformableAttention를 사용하기 위해서는 높은 버전의 mmcv를 사용해야 하는데 mmcv 1.4.0에서는 지원하지 않았음
+    - 문제가 발생하기 전까지 mmcv 1.7.2를 사용하기로 결정
 
 
 

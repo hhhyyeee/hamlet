@@ -9,10 +9,30 @@ def get_model_base(architecture, backbone):
     architecture = architecture.replace("big", "")
     architecture = architecture.replace("little", "")
     if "segformer" in architecture:
+        if "custom" in backbone:        #!DEBUG
+            if "adpt" in backbone:      #!DEBUG
+                backbone_, _, adapt = backbone.split("_")
+                return {
+                    "mitb5": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                    # It's intended that <=b4 refers to b5 config
+                    "mitb4": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                    "mitb3": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                    "mitb2": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                    "mitb1": f"_base_/models/{architecture}_b1_custom_{adapt}.py",
+                    "mitb0": f"_base_/models/{architecture}_b0_custom_{adapt}.py",
+                }[backbone_]
+            else:
+                backbone_, _ = backbone.split("_")
+                return {
+                    "mitb5": f"_base_/models/{architecture}_b5_custom.py",
+                    # It's intended that <=b4 refers to b5 config
+                    "mitb4": f"_base_/models/{architecture}_b5_custom.py",
+                    "mitb3": f"_base_/models/{architecture}_b5_custom.py",
+                    "mitb2": f"_base_/models/{architecture}_b5_custom.py",
+                    "mitb1": f"_base_/models/{architecture}_b1_custom.py",
+                    "mitb0": f"_base_/models/{architecture}_b0_custom.py",
+                }[backbone_]
         return {
-            "mitb5_custom": f"_base_/models/{architecture}_b5_custom.py",
-            "mitb3_custom": f"_base_/models/{architecture}_b5_custom.py",
-
             "mitb5": f"_base_/models/{architecture}_b5.py",
             # It's intended that <=b4 refers to b5 config
             "mitb4": f"_base_/models/{architecture}_b5.py",
@@ -79,7 +99,8 @@ def get_pretraining_file(backbone):
 
 def get_backbone_cfg(backbone):
     for i in [0, 1, 2, 3, 4, 5]:
-        if (backbone == f"mitb{i}") | (backbone == f"mitb{i}_custom"):
+        if f"mitb{i}" in backbone:
+        # if (backbone == f"mitb{i}") | (backbone == f"mitb{i}_custom"):
         # if backbone == f"mitb{i}":
             return dict(type=f"mit_b{i}")
         if backbone == f"mitb{i}-del":
@@ -171,17 +192,17 @@ def generate_experiment_cfgs(id):
 
         loss_weight = [0, 0, 0, 1] if not train_lightweight_decoder else [1, 0, 0, 0]
 
-        if "mit" in backbone and "original" not in architecture_mod:
-            main_module = [i for i, w in enumerate(loss_weight) if w != 0][-1] + 1
-            cfg["model"]["modular_training"] = modular_training
-            cfg["model"]["training_policy"] = training_policy
-            cfg["model"]["loss_weight"] = loss_weight
-            cfg["model"]["num_module"] = main_module
-            cfg["model"]["modules_update"] = modules_update
-            cfg["model"]["batchnorm"] = batchnorm
-            cfg["model"]["alpha"] = alpha
-            cfg["model"]["mad_time_update"] = mad_time_update
-            cfg["model"]["temperature"] = temperature
+        # if "mit" in backbone and "original" not in architecture_mod:
+        #     main_module = [i for i, w in enumerate(loss_weight) if w != 0][-1] + 1
+        #     cfg["model"]["modular_training"] = modular_training
+        #     cfg["model"]["training_policy"] = training_policy
+        #     cfg["model"]["loss_weight"] = loss_weight
+        #     cfg["model"]["num_module"] = main_module
+        #     cfg["model"]["modules_update"] = modules_update
+        #     cfg["model"]["batchnorm"] = batchnorm
+        #     cfg["model"]["alpha"] = alpha
+        #     cfg["model"]["mad_time_update"] = mad_time_update
+        #     cfg["model"]["temperature"] = temperature
 
         if architecture_mod == "bigsegformer":
             cfg["model"]["decode_head"] = dict(
@@ -201,8 +222,7 @@ def generate_experiment_cfgs(id):
         # this is for warmup target or source
         cfg["segmentator_pretrained"] = pretrained_segmentator
 
-        #!DEBUG
-        cfg["freeze_backbone"] = freeze_backbone
+        cfg["freeze_backbone"] = freeze_backbone #!DEBUG
         a=1
 
         # Setup UDA config

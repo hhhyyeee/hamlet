@@ -63,6 +63,7 @@ class EncoderDecoder(BaseSegmentor):
             else:
                 self.auxiliary_head = builder.build_head(auxiliary_head)
 
+    # @profile
     def extract_feat(self, img):
         """Extract features from images."""
         x = self.backbone(img)
@@ -70,6 +71,7 @@ class EncoderDecoder(BaseSegmentor):
             x = self.neck(x)
         return x
 
+    # @profile
     def encode_decode(self, img, img_metas):
         """Encode images with backbone and decode into a semantic segmentation
         map of the same size as input."""
@@ -131,6 +133,7 @@ class EncoderDecoder(BaseSegmentor):
 
         return seg_logit
 
+    # @profile
     def forward_train(self,
                       img,
                       img_metas,

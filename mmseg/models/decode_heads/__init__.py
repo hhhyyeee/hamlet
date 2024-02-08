@@ -5,6 +5,7 @@ from .dlv2_head import DLV2Head
 from .fcn_head import FCNHead
 from .isa_head import ISAHead
 from .original_segformer_head import OriginalSegFormerHead
+from .decodesc_segformer_head import DecodeSCSegFormerHead
 from .psp_head import PSPHead
 from .segformer_head import SegFormerHead
 from .sep_aspp_head import DepthwiseSeparableASPPHead
@@ -21,5 +22,6 @@ __all__ = [
     'SegFormerHead',
     'DAFormerHead',
     'ISAHead',
-    'OriginalSegFormerHead'
+    'OriginalSegFormerHead',
+    'DecodeSCSegFormerHead'
 ]

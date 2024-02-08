@@ -21,6 +21,10 @@ from mmseg.models.pet import Adapter, KVLoRA
 from mmseg.models.pet_mixin import AdapterMixin
 from mmseg.utils import get_root_logger
 
+import timm
+
+from mmseg.models.pet.vitadapter import SpatialPriorModule, Injector, deform_inputs
+from torch.nn.init import normal_
 
 class Mlp(nn.Module):
 
@@ -148,10 +152,6 @@ class Block(nn.Module, AdapterMixin):
 
     def forward(self, x, H, W):
         a=1
-        # # ----- original code -----
-        # x = x + self.drop_path(self.attn(self.norm1(x), H, W))
-        # x = x + self.drop_path(self.mlp(self.norm2(x), H, W))
-        # # -------------------------
 
         # kwargs = {"Adapter": [H, W]}
         kwargs = {"H": H, "W": W}
@@ -241,16 +241,32 @@ class MixVisionTransformer(BaseModule):
         self.pretrained = pretrained
         self.init_cfg = init_cfg
 
-        # PET
+        # --- PET
         a=1
-        # PET = hasattr(cfg, "adapt_blocks")
         PET = "adapt_blocks" in cfg
         if PET:
             adapt_blocks = cfg["adapt_blocks"]
             pet_cls = cfg["pet_cls"]
             pet_kwargs = {"scale": None}
 
+            a=1
             self.embed_dims_adapter = [_dim for idx, _dim in enumerate(embed_dims) if idx in adapt_blocks]
+
+        # --- auxiliary classifier
+        self.clf_flag = cfg["aux_classifier"]
+        if self.clf_flag:
+            a=1
+            _embed_dim = embed_dims[2]
+            # vit_adapter_embed_dim = embed_dims[1] #(64, 128, 320, 512)
+            self.stem = SpatialPriorModule(embed_dim=_embed_dim)
+            self.injector = Injector(dim=_embed_dim, num_heads=8, n_levels=3) #embed_dims[2]가 320인데 320/8=40으로 딱 떨어질 수 있도록 num_heads 설정
+
+            self.level_embed = nn.Parameter(torch.zeros(3, _embed_dim))
+            normal_(self.level_embed)
+        
+        # --- custom decoder
+        self.decoder_custom = "decoder_custom" in cfg
+        a=1
 
         # patch_embed
         self.patch_embed1 = OverlapPatchEmbed(
@@ -360,7 +376,6 @@ class MixVisionTransformer(BaseModule):
 
             self.attach_pets_mit()
 
-
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
             trunc_normal_(m.weight, std=.02)
@@ -441,7 +456,7 @@ class MixVisionTransformer(BaseModule):
                     for p in v.parameters():
                         p.requires_grad = requires_grad
 
-    def forward_features(self, x, modules):
+    def forward_features_orig(self, x, modules):
         B = x.shape[0]
         outs = []
 
@@ -483,56 +498,146 @@ class MixVisionTransformer(BaseModule):
 
         return outs
 
-    def forward_features(self, x, modules):
+    def forward_features(self, x):
+        if not self.clf_flag:
+            return self.forward_features_orig(x, modules=[1, 2, 3, 4])
+
+        a=1
+        # stage 0: clone input x
+
+        # === stem 입력으로 _x라는 클론 텐서를 넣기 위한 몸부림... 하지만 실패
+        # _x = x.detach().clone()
+        # _x = torch.Tensor.new_tensor(x, requires_grad=True)
+        # _x = torch.tensor(x)
+        # === 그냥 x를 넣어보자...
+
+        c1, c2, c3, c4 = self.stem(x) # c3 사용시 backprop 문제없이 됨 -> 문제없을듯
+        c2, c3, c4 = self._add_level_embed(c2, c3, c4)
+        c = torch.cat([c2, c3, c4], dim=1)
+        a=1
+
+        deform_inputs1, deform_inputs2 = deform_inputs(x)
         B = x.shape[0]
         outs = []
 
-        # stage 1
-        if 1 in modules:
-            x, H, W = self.patch_embed1(x)
-            for i, blk in enumerate(self.block1):
-                x = blk(x, H, W)
-            x = self.norm1(x)
-            x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
-            outs.append(x)
+        # stage 1-1: MiT block 1~2
+        # block 1
+        x, H, W = self.patch_embed1(x)
+        for i, blk in enumerate(self.block1):
+            x = blk(x, H, W)
+        x = self.norm1(x)
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
 
-        # stage 2
-        if 2 in modules:
-            x, H, W = self.patch_embed2(x)
-            for i, blk in enumerate(self.block2):
-                x = blk(x, H, W)
-            x = self.norm2(x)
-            x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
-            outs.append(x)
+        # block 2
+        x, H, W = self.patch_embed2(x)
+        for i, blk in enumerate(self.block2):
+            x = blk(x, H, W)
+        x = self.norm2(x)
+        # inj_x = x.detach().clone()
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
 
-        # stage 3
-        if 3 in modules:
-            x, H, W = self.patch_embed3(x)
-            for i, blk in enumerate(self.block3):
-                x = blk(x, H, W)
-            x = self.norm3(x)
-            x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
-            outs.append(x)
+        # stage 1-2: aux_clf (STEM?)
+        a=1
 
-        # stage 4
-        if 4 in modules:
-            x, H, W = self.patch_embed4(x)
-            for i, blk in enumerate(self.block4):
-                x = blk(x, H, W)
-            x = self.norm4(x)
-            x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
-            outs.append(x)
+        # block 3
+        x, H, W = self.patch_embed3(x)
+        # inj_x = x.detach().clone()
+        # inj_x = torch.Tensor(inj_x, requires_grad=True)
+        # inj_x = torch.tensor(x)
+
+        # (+) stage 1-3: fusion (INJECTOR?)
+        a=1
+        # x = self.injector(query=x, feat=c, H=H, W=W)
+        x = self.injector(query=x, reference_points=deform_inputs1[0], feat=c,
+                          spatial_shapes=deform_inputs1[1], level_start_index=deform_inputs1[2])
+
+        # x = x + c3 #!DEBUG
+
+        for i, blk in enumerate(self.block3):
+            x = blk(x, H, W)
+        x = self.norm3(x)
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+
+        # block 4
+        x, H, W = self.patch_embed4(x)
+        for i, blk in enumerate(self.block4):
+            x = blk(x, H, W)
+        x = self.norm4(x)
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
 
         return outs
+ 
+
+    def forward_features_ordered(self, x):
+        # if not self.clf_flag:
+        #     return self.forward_features_orig(x, modules=[1, 2, 3, 4])
+
+        # stage 0: aux_clf feature extract
+        c1, c2, c3, c4 = self.stem(x) # c3 사용시 backprop 문제없이 됨 -> 문제없을듯
+        c2, c3, c4 = self._add_level_embed(c2, c3, c4)
+        c = torch.cat([c2, c3, c4], dim=1)
+
+        deform_inputs1, deform_inputs2 = deform_inputs(x)
+        B = x.shape[0]
+        outs = []
+
+        # stage 1-1: MiT block 1~2
+        # block 1
+        x, H, W = self.patch_embed1(x)
+        for i, blk in enumerate(self.block1):
+            x = blk(x, H, W)
+        x = self.norm1(x)
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+
+        # block 2
+        x, H, W = self.patch_embed2(x)
+        for i, blk in enumerate(self.block2):
+            x = blk(x, H, W)
+        x = self.norm2(x)
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+
+        # block 3
+        x, H, W = self.patch_embed3(x)
+
+        # (+) stage 1-3: fusion (INJECTOR?)
+        x = self.injector(query=x, reference_points=deform_inputs1[0], feat=c,
+                          spatial_shapes=deform_inputs1[1], level_start_index=deform_inputs1[2])
+
+        for i, blk in enumerate(self.block3):
+            x = blk(x, H, W)
+        x = self.norm3(x)
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+
+        # block 4
+        x, H, W = self.patch_embed4(x)
+        for i, blk in enumerate(self.block4):
+            x = blk(x, H, W)
+        x = self.norm4(x)
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+
+        return outs, (c1, c2, c3, c4, c)
+
 
     def forward(self, x, module=4):
         modules = range(1, module + 1)
-        x = self.forward_features(x, modules)
+        if self.decoder_custom:
+            x = self.forward_features_ordered(x)
+        else:
+            x = self.forward_features(x)
+        a=1
         # x = self.head(x)
 
         return x
 
-
+    # --- LAE pets
     def create_pets(self):
         return self.create_pets_mit()
 
@@ -547,9 +652,9 @@ class MixVisionTransformer(BaseModule):
 
         if self.pet_cls == "Adapter":
             adapter_list_list = []
-            for idx, embed_dim in enumerate(embed_dims):
+            for idx, (_block_idx, embed_dim) in enumerate(zip(self.adapt_blocks, embed_dims)):
                 adapter_list = []
-                for _ in range(depths[idx]):
+                for _ in range(depths[_block_idx]):
                     kwargs = dict(**self.pet_kwargs)
                     kwargs["embed_dim"] = embed_dim
                     # adapter_list.append(Adapter(**kwargs))
@@ -572,23 +677,25 @@ class MixVisionTransformer(BaseModule):
         assert self.pet_cls in ["Adapter", "LoRA", "Prefix"], "ERROR 1"
 
         pets = self.pets
-        a=1
-
         if self.pet_cls == "Adapter":
-            for _dim_idx, _dim in enumerate(self.embed_dims_adapter):
+            for _idx, (_dim_idx, _dim) in enumerate(zip(self.adapt_blocks, self.embed_dims_adapter)):
+            # for _dim_idx, _dim in enumerate(self.embed_dims_adapter):
                 for _depth_idx in range(self.depths[_dim_idx]):
-                    # print(f"self.block{_dim_idx + 1}[{_depth_idx}].attach_adapter(mlp=pets[{_dim_idx}][{_depth_idx}])")
-
-                    # _block = getattr(self, f"block{_dim_idx + 1}")
-                    # _block[_depth_idx].attach_adapter(attn=pets[_dim_idx]) #inline
-
-                    eval(f"self.block{_dim_idx + 1}")[_depth_idx].attach_adapter(mlp=pets[_dim_idx][_depth_idx])
+                    eval(f"self.block{_dim_idx + 1}")[_depth_idx].attach_adapter(mlp=pets[_idx][_depth_idx])
             return
 
         if self.pet_cls == "LoRA":
             for i, b in enumerate(self.adapt_blocks):
                 a=1
                 eval(f"self.block{b}").attn.attch_adapter(qkv=pets[i])
+
+    # --- ViTAdapter
+    def _add_level_embed(self, c2, c3, c4):
+        c2 = c2 + self.level_embed[0]
+        c3 = c3 + self.level_embed[1]
+        c4 = c4 + self.level_embed[2]
+        return c2, c3, c4
+
 
 
 class DWConv(nn.Module):
@@ -700,4 +807,3 @@ class mit_b5(MixVisionTransformer):
             depths=[3, 6, 40, 3],
             sr_ratios=[8, 4, 2, 1],
             **kwargs)
-        a=1
