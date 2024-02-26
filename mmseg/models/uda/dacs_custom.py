@@ -331,7 +331,7 @@ class DACS(CustomUDADecorator):
         return feat_loss, feat_log
 
     # @profile
-    def forward_train(self, img, img_metas, gt_semantic_seg, target_img, target_img_metas):
+    def forward_train(self, img, img_metas, gt_semantic_seg, target_img, target_img_metas, **kwargs):
         """Forward function for training.
 
         Args:
@@ -350,6 +350,9 @@ class DACS(CustomUDADecorator):
         log_vars = {}
         batch_size = img.shape[0]
         dev = img.device
+
+        #!DEBUG
+        target_gt_semantic_seg = kwargs.get("target_gt_semantic_seg", None)
 
         #  module to forward
         main_model = self.get_main_model()
@@ -410,10 +413,21 @@ class DACS(CustomUDADecorator):
                 m.training = False
             if isinstance(m, DropPath):
                 m.training = False
-        ema_logits = self.get_ema_model().encode_decode(target_img, target_img_metas)
+        # ema_logits = self.get_ema_model().encode_decode(target_img, target_img_metas)
+        if target_gt_semantic_seg is not None:
+            # ema_logits = target_gt_semantic_seg.float()
+            # ema_softmax = target_gt_semantic_seg.float()
+            # pseudo_prob, pseudo_label = torch.max(ema_softmax, dim=1)
+            pseudo_prob = torch.max(target_gt_semantic_seg, dim=1)[0]
+            pseudo_label = pseudo_prob
+        else:
+            ema_logits = self.get_ema_model().encode_decode(target_img, target_img_metas)
+            ema_softmax = torch.softmax(ema_logits.detach(), dim=1)
+            pseudo_prob, pseudo_label = torch.max(ema_softmax, dim=1)
+        # ema_logits = self.get_ema_model().get_target_gt_seg(target_img, target_img_metas)
 
-        ema_softmax = torch.softmax(ema_logits.detach(), dim=1)
-        pseudo_prob, pseudo_label = torch.max(ema_softmax, dim=1)
+        # ema_softmax = torch.softmax(ema_logits.detach(), dim=1)
+        # pseudo_prob, pseudo_label = torch.max(ema_softmax, dim=1)
         ps_large_p = pseudo_prob.ge(self.pseudo_threshold).long() == 1
         ps_size = np.size(np.array(pseudo_label.cpu()))
         pseudo_weight = torch.sum(ps_large_p).item() / ps_size
@@ -491,6 +505,8 @@ class DACS(CustomUDADecorator):
             (clean_loss + feat_loss + mix_loss).backward()
         else:
             (clean_loss + mix_loss).backward()
+            # (0.3 * clean_loss + 0.7 * mix_loss).backward()
+            # (0.75 * clean_loss + 1.25 * mix_loss).backward()
 
         # if not self.benchmark and self.local_iter % 20 == 0: #!DEBUG
         if not self.benchmark and self.local_iter % self.debug_img_interval == 0:

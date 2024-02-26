@@ -170,6 +170,7 @@ class OnlineRunner(EpochBasedRunner):
                 **source_data,
                 "target_img_metas": target_data["img_metas"],
                 "target_img": target_data["img"],
+                # "target_gt_semantic_seg": target_data["gt_semantic_seg"] #! when training with GT (supervised)
             }
             self._inner_iter = i
             self.call_hook("before_train_iter")
