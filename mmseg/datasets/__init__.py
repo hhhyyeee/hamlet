@@ -1,4 +1,5 @@
 from .builder import DATASETS, PIPELINES, build_dataloader, build_dataset
+from .acdc import ACDCDataset
 from .cityscapes import CityscapesDataset
 from .cityscapes_video import CityscapesDatasetVideo
 from .custom import CustomDataset
@@ -28,4 +29,5 @@ __all__ = [
     'ShiftDataset',
     'ShiftDatasetVideo',
     'CityscapesDatasetVideo',
+    'ACDCDataset',
 ]
