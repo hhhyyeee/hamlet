@@ -112,6 +112,7 @@ class OthersEncoderDecoder(EncoderDecoder):
 
         return {f"confidence": conf, "entropy": entr}
 
+<<<<<<< HEAD
     # #!DEBUG
     # def rgb_to_one_hot(self, rgb_map, class_rgb_values=PALETTE):
     #     """
@@ -184,4 +185,6 @@ class OthersEncoderDecoder(EncoderDecoder):
 
     #     return torch.stack(seg_list, 0).to("cuda")
 
+=======
+>>>>>>> bc0f1fc5e91bc6afda8edc0ae0b859d42eea6023
 

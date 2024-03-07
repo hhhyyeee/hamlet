@@ -13,9 +13,7 @@ from experiments import generate_experiment_cfgs
 from experiments_custom import generate_experiment_cfgs as generate_experiment_cfgs_custom
 CUSTOM = True
 
-# import mmcv
 from mmcv import Config, get_git_hash
-# from mmengine.config import Config
 
 # from mmseg.apis import set_random_seed
 from tools import train

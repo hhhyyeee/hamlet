@@ -529,7 +529,6 @@ def generate_experiment_cfgs(id):
     seed = 0
 
     freeze_backbone = False #!DETERMINED
-    decoder_custom = False
 
     # -------------------------------------------------------------------------
     # Config experiments:

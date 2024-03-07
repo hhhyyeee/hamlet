@@ -42,21 +42,33 @@ data = dict(
     workers_per_gpu=4,
     train=dict(
         type=dataset_type,
+<<<<<<< HEAD
         domain=1,
+=======
+        domain=0,
+>>>>>>> bc0f1fc5e91bc6afda8edc0ae0b859d42eea6023
         data_root=data_root,
         img_dir='rgb_anon/fog/train',
         ann_dir='data/ACDC/gt/fog/train',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
+<<<<<<< HEAD
         name='fog',
+=======
+        name='clear',
+>>>>>>> bc0f1fc5e91bc6afda8edc0ae0b859d42eea6023
         data_root=data_root,
         img_dir='rgb_anon/fog/val',
         ann_dir='data/ACDC/gt/fog/val',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
+<<<<<<< HEAD
         name='fog',
+=======
+        name='clear',
+>>>>>>> bc0f1fc5e91bc6afda8edc0ae0b859d42eea6023
         data_root=data_root,
         img_dir='rgb_anon/fog/val',
         ann_dir='data/ACDC/gt/fog/val',
