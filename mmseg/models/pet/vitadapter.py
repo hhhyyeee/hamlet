@@ -7,7 +7,7 @@ from functools import partial
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint as cp
-from mmseg.models.pet.ms_deform_attn import MSDeformAttn
+# from mmseg.models.pet.ms_deform_attn import MSDeformAttn
 from timm.models.layers import DropPath
 
 from mmcv.cnn.bricks.transformer import build_attention
@@ -93,47 +93,47 @@ class DWConv(nn.Module):
         return x
 
 
-class Extractor(nn.Module):
-    def __init__(self, dim, num_heads=6, n_points=4, n_levels=1, deform_ratio=1.0,
-                 with_cffn=True, cffn_ratio=0.25, drop=0., drop_path=0.,
-                 norm_layer=partial(nn.LayerNorm, eps=1e-6), with_cp=False):
-        super().__init__()
-        self.query_norm = norm_layer(dim)
-        self.feat_norm = norm_layer(dim)
-        self.attn = MSDeformAttn(d_model=dim, n_levels=n_levels, n_heads=num_heads,
-                                 n_points=n_points, ratio=deform_ratio)
-        self.with_cffn = with_cffn
-        self.with_cp = with_cp
-        if with_cffn:
-            self.ffn = ConvFFN(in_features=dim, hidden_features=int(dim * cffn_ratio), drop=drop)
-            self.ffn_norm = norm_layer(dim)
-            self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+# class Extractor(nn.Module):
+#     def __init__(self, dim, num_heads=6, n_points=4, n_levels=1, deform_ratio=1.0,
+#                  with_cffn=True, cffn_ratio=0.25, drop=0., drop_path=0.,
+#                  norm_layer=partial(nn.LayerNorm, eps=1e-6), with_cp=False):
+#         super().__init__()
+#         self.query_norm = norm_layer(dim)
+#         self.feat_norm = norm_layer(dim)
+#         self.attn = MSDeformAttn(d_model=dim, n_levels=n_levels, n_heads=num_heads,
+#                                  n_points=n_points, ratio=deform_ratio)
+#         self.with_cffn = with_cffn
+#         self.with_cp = with_cp
+#         if with_cffn:
+#             self.ffn = ConvFFN(in_features=dim, hidden_features=int(dim * cffn_ratio), drop=drop)
+#             self.ffn_norm = norm_layer(dim)
+#             self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
-    def forward(self, query, reference_points, feat, spatial_shapes, level_start_index, H, W):
+#     def forward(self, query, reference_points, feat, spatial_shapes, level_start_index, H, W):
         
-        def _inner_forward(query, feat):
+#         def _inner_forward(query, feat):
 
-            attn = self.attn(self.query_norm(query), reference_points,
-                             self.feat_norm(feat), spatial_shapes,
-                             level_start_index, None)
-            query = query + attn
+#             attn = self.attn(self.query_norm(query), reference_points,
+#                              self.feat_norm(feat), spatial_shapes,
+#                              level_start_index, None)
+#             query = query + attn
     
-            if self.with_cffn:
-                query = query + self.drop_path(self.ffn(self.ffn_norm(query), H, W))
-            return query
+#             if self.with_cffn:
+#                 query = query + self.drop_path(self.ffn(self.ffn_norm(query), H, W))
+#             return query
         
-        if self.with_cp and query.requires_grad:
-            query = cp.checkpoint(_inner_forward, query, feat)
-        else:
-            query = _inner_forward(query, feat)
+#         if self.with_cp and query.requires_grad:
+#             query = cp.checkpoint(_inner_forward, query, feat)
+#         else:
+#             query = _inner_forward(query, feat)
             
-        return query
+#         return query
 
 
 class Injector(nn.Module):
     """240130 ver.
     """
-    def __init__(self, dim, num_heads=6, n_points=4, n_levels=1, deform_ratio=1.0,
+    def __init__(self, dim, num_heads=6, n_points=4, n_levels=4, dropout=0.1, deform_ratio=1.0,
                  norm_layer=partial(nn.LayerNorm, eps=1e-6), init_values=0., with_cp=False):
         super().__init__()
         self.with_cp = with_cp
@@ -142,12 +142,13 @@ class Injector(nn.Module):
         self.attn = MultiScaleDeformableAttention(embed_dims=dim,
                                                   num_heads=num_heads,
                                                   num_levels=n_levels,
+                                                  num_points=n_points,
+                                                  dropout=dropout,
                                                   batch_first=True)
         self.gamma = nn.Parameter(init_values * torch.ones((dim)), requires_grad=True)
 
     def forward(self, query, reference_points, feat, spatial_shapes, level_start_index):
         def _inner_forward(query, feat):
-
             attn = self.attn(self.query_norm(query),
                              self.feat_norm(feat),
                              self.feat_norm(feat),
@@ -160,88 +161,88 @@ class Injector(nn.Module):
             query = cp.checkpoint(_inner_forward, query, feat)
         else:
             query = _inner_forward(query, feat)
-            
+
         return query
 
 
-class InteractionBlock(nn.Module):
-    def __init__(self, dim, num_heads=6, n_points=4, norm_layer=partial(nn.LayerNorm, eps=1e-6),
-                 drop=0., drop_path=0., with_cffn=True, cffn_ratio=0.25, init_values=0.,
-                 deform_ratio=1.0, extra_extractor=False, with_cp=False):
-        super().__init__()
+# class InteractionBlock(nn.Module):
+#     def __init__(self, dim, num_heads=6, n_points=4, norm_layer=partial(nn.LayerNorm, eps=1e-6),
+#                  drop=0., drop_path=0., with_cffn=True, cffn_ratio=0.25, init_values=0.,
+#                  deform_ratio=1.0, extra_extractor=False, with_cp=False):
+#         super().__init__()
 
-        self.injector = Injector(dim=dim, n_levels=3, num_heads=num_heads, init_values=init_values,
-                                 n_points=n_points, norm_layer=norm_layer, deform_ratio=deform_ratio,
-                                 with_cp=with_cp)
-        self.extractor = Extractor(dim=dim, n_levels=1, num_heads=num_heads, n_points=n_points,
-                                   norm_layer=norm_layer, deform_ratio=deform_ratio, with_cffn=with_cffn,
-                                   cffn_ratio=cffn_ratio, drop=drop, drop_path=drop_path, with_cp=with_cp)
-        if extra_extractor:
-            self.extra_extractors = nn.Sequential(*[
-                Extractor(dim=dim, num_heads=num_heads, n_points=n_points, norm_layer=norm_layer,
-                          with_cffn=with_cffn, cffn_ratio=cffn_ratio, deform_ratio=deform_ratio,
-                          drop=drop, drop_path=drop_path, with_cp=with_cp)
-                for _ in range(2)
-            ])
-        else:
-            self.extra_extractors = None
+#         self.injector = Injector(dim=dim, n_levels=3, num_heads=num_heads, init_values=init_values,
+#                                  n_points=n_points, norm_layer=norm_layer, deform_ratio=deform_ratio,
+#                                  with_cp=with_cp)
+#         self.extractor = Extractor(dim=dim, n_levels=1, num_heads=num_heads, n_points=n_points,
+#                                    norm_layer=norm_layer, deform_ratio=deform_ratio, with_cffn=with_cffn,
+#                                    cffn_ratio=cffn_ratio, drop=drop, drop_path=drop_path, with_cp=with_cp)
+#         if extra_extractor:
+#             self.extra_extractors = nn.Sequential(*[
+#                 Extractor(dim=dim, num_heads=num_heads, n_points=n_points, norm_layer=norm_layer,
+#                           with_cffn=with_cffn, cffn_ratio=cffn_ratio, deform_ratio=deform_ratio,
+#                           drop=drop, drop_path=drop_path, with_cp=with_cp)
+#                 for _ in range(2)
+#             ])
+#         else:
+#             self.extra_extractors = None
 
-    def forward(self, x, c, blocks, deform_inputs1, deform_inputs2, H, W):
-        x = self.injector(query=x, reference_points=deform_inputs1[0],
-                          feat=c, spatial_shapes=deform_inputs1[1],
-                          level_start_index=deform_inputs1[2])
-        for idx, blk in enumerate(blocks):
-            x = blk(x, H, W)
-        c = self.extractor(query=c, reference_points=deform_inputs2[0],
-                           feat=x, spatial_shapes=deform_inputs2[1],
-                           level_start_index=deform_inputs2[2], H=H, W=W)
-        if self.extra_extractors is not None:
-            for extractor in self.extra_extractors:
-                c = extractor(query=c, reference_points=deform_inputs2[0],
-                              feat=x, spatial_shapes=deform_inputs2[1],
-                              level_start_index=deform_inputs2[2], H=H, W=W)
-        return x, c
+#     def forward(self, x, c, blocks, deform_inputs1, deform_inputs2, H, W):
+#         x = self.injector(query=x, reference_points=deform_inputs1[0],
+#                           feat=c, spatial_shapes=deform_inputs1[1],
+#                           level_start_index=deform_inputs1[2])
+#         for idx, blk in enumerate(blocks):
+#             x = blk(x, H, W)
+#         c = self.extractor(query=c, reference_points=deform_inputs2[0],
+#                            feat=x, spatial_shapes=deform_inputs2[1],
+#                            level_start_index=deform_inputs2[2], H=H, W=W)
+#         if self.extra_extractors is not None:
+#             for extractor in self.extra_extractors:
+#                 c = extractor(query=c, reference_points=deform_inputs2[0],
+#                               feat=x, spatial_shapes=deform_inputs2[1],
+#                               level_start_index=deform_inputs2[2], H=H, W=W)
+#         return x, c
 
 
-class InteractionBlockWithCls(nn.Module):
-    def __init__(self, dim, num_heads=6, n_points=4, norm_layer=partial(nn.LayerNorm, eps=1e-6),
-                 drop=0., drop_path=0., with_cffn=True, cffn_ratio=0.25, init_values=0.,
-                 deform_ratio=1.0, extra_extractor=False, with_cp=False):
-        super().__init__()
+# class InteractionBlockWithCls(nn.Module):
+#     def __init__(self, dim, num_heads=6, n_points=4, norm_layer=partial(nn.LayerNorm, eps=1e-6),
+#                  drop=0., drop_path=0., with_cffn=True, cffn_ratio=0.25, init_values=0.,
+#                  deform_ratio=1.0, extra_extractor=False, with_cp=False):
+#         super().__init__()
 
-        self.injector = Injector(dim=dim, n_levels=3, num_heads=num_heads, init_values=init_values,
-                                 n_points=n_points, norm_layer=norm_layer, deform_ratio=deform_ratio,
-                                 with_cp=with_cp)
-        self.extractor = Extractor(dim=dim, n_levels=1, num_heads=num_heads, n_points=n_points,
-                                   norm_layer=norm_layer, deform_ratio=deform_ratio, with_cffn=with_cffn,
-                                   cffn_ratio=cffn_ratio, drop=drop, drop_path=drop_path, with_cp=with_cp)
-        if extra_extractor:
-            self.extra_extractors = nn.Sequential(*[
-                Extractor(dim=dim, num_heads=num_heads, n_points=n_points, norm_layer=norm_layer,
-                          with_cffn=with_cffn, cffn_ratio=cffn_ratio, deform_ratio=deform_ratio,
-                          drop=drop, drop_path=drop_path, with_cp=with_cp)
-                for _ in range(2)
-            ])
-        else:
-            self.extra_extractors = None
+#         self.injector = Injector(dim=dim, n_levels=3, num_heads=num_heads, init_values=init_values,
+#                                  n_points=n_points, norm_layer=norm_layer, deform_ratio=deform_ratio,
+#                                  with_cp=with_cp)
+#         self.extractor = Extractor(dim=dim, n_levels=1, num_heads=num_heads, n_points=n_points,
+#                                    norm_layer=norm_layer, deform_ratio=deform_ratio, with_cffn=with_cffn,
+#                                    cffn_ratio=cffn_ratio, drop=drop, drop_path=drop_path, with_cp=with_cp)
+#         if extra_extractor:
+#             self.extra_extractors = nn.Sequential(*[
+#                 Extractor(dim=dim, num_heads=num_heads, n_points=n_points, norm_layer=norm_layer,
+#                           with_cffn=with_cffn, cffn_ratio=cffn_ratio, deform_ratio=deform_ratio,
+#                           drop=drop, drop_path=drop_path, with_cp=with_cp)
+#                 for _ in range(2)
+#             ])
+#         else:
+#             self.extra_extractors = None
 
-    def forward(self, x, c, cls, blocks, deform_inputs1, deform_inputs2, H, W):
-        x = self.injector(query=x, reference_points=deform_inputs1[0],
-                          feat=c, spatial_shapes=deform_inputs1[1],
-                          level_start_index=deform_inputs1[2])
-        x = torch.cat((cls, x), dim=1)
-        for idx, blk in enumerate(blocks):
-            x = blk(x, H, W)
-        cls, x = x[:, :1, ], x[:, 1:, ]
-        c = self.extractor(query=c, reference_points=deform_inputs2[0],
-                           feat=x, spatial_shapes=deform_inputs2[1],
-                           level_start_index=deform_inputs2[2], H=H, W=W)
-        if self.extra_extractors is not None:
-            for extractor in self.extra_extractors:
-                c = extractor(query=c, reference_points=deform_inputs2[0],
-                              feat=x, spatial_shapes=deform_inputs2[1],
-                              level_start_index=deform_inputs2[2], H=H, W=W)
-        return x, c, cls
+#     def forward(self, x, c, cls, blocks, deform_inputs1, deform_inputs2, H, W):
+#         x = self.injector(query=x, reference_points=deform_inputs1[0],
+#                           feat=c, spatial_shapes=deform_inputs1[1],
+#                           level_start_index=deform_inputs1[2])
+#         x = torch.cat((cls, x), dim=1)
+#         for idx, blk in enumerate(blocks):
+#             x = blk(x, H, W)
+#         cls, x = x[:, :1, ], x[:, 1:, ]
+#         c = self.extractor(query=c, reference_points=deform_inputs2[0],
+#                            feat=x, spatial_shapes=deform_inputs2[1],
+#                            level_start_index=deform_inputs2[2], H=H, W=W)
+#         if self.extra_extractors is not None:
+#             for extractor in self.extra_extractors:
+#                 c = extractor(query=c, reference_points=deform_inputs2[0],
+#                               feat=x, spatial_shapes=deform_inputs2[1],
+#                               level_start_index=deform_inputs2[2], H=H, W=W)
+#         return x, c, cls
     
 
 class SpatialPriorModule(nn.Module):
@@ -251,29 +252,29 @@ class SpatialPriorModule(nn.Module):
 
         self.stem = nn.Sequential(*[
             nn.Conv2d(3, inplanes, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.SyncBatchNorm(inplanes),
+            nn.BatchNorm2d(inplanes),
             nn.ReLU(inplace=True),
             nn.Conv2d(inplanes, inplanes, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.SyncBatchNorm(inplanes),
+            nn.BatchNorm2d(inplanes),
             nn.ReLU(inplace=True),
             nn.Conv2d(inplanes, inplanes, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.SyncBatchNorm(inplanes),
+            nn.BatchNorm2d(inplanes),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         ])
         self.conv2 = nn.Sequential(*[
             nn.Conv2d(inplanes, 2 * inplanes, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.SyncBatchNorm(2 * inplanes),
+            nn.BatchNorm2d(2 * inplanes),
             nn.ReLU(inplace=True)
         ])
         self.conv3 = nn.Sequential(*[
             nn.Conv2d(2 * inplanes, 4 * inplanes, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.SyncBatchNorm(4 * inplanes),
+            nn.BatchNorm2d(4 * inplanes),
             nn.ReLU(inplace=True)
         ])
         self.conv4 = nn.Sequential(*[
             nn.Conv2d(4 * inplanes, 4 * inplanes, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.SyncBatchNorm(4 * inplanes),
+            nn.BatchNorm2d(4 * inplanes),
             nn.ReLU(inplace=True)
         ])
         self.fc1 = nn.Conv2d(inplanes, embed_dim, kernel_size=1, stride=1, padding=0, bias=True)
@@ -378,34 +379,34 @@ class CrossAttention(nn.Module):
         return x
 
 
-# ----- deprecated (240130) -----
-class OrigInjector(nn.Module):
-    def __init__(self, dim, num_heads=6, n_points=4, n_levels=1, deform_ratio=1.0,
-                 norm_layer=partial(nn.LayerNorm, eps=1e-6), init_values=0., with_cp=False):
-        super().__init__()
-        self.with_cp = with_cp
-        self.query_norm = norm_layer(dim)
-        self.feat_norm = norm_layer(dim)
-        self.attn = MSDeformAttn(d_model=dim, n_levels=n_levels, n_heads=num_heads,
-                                 n_points=n_points, ratio=deform_ratio)
-        self.gamma = nn.Parameter(init_values * torch.ones((dim)), requires_grad=True)
+# # ----- deprecated (240130) -----
+# class OrigInjector(nn.Module):
+#     def __init__(self, dim, num_heads=6, n_points=4, n_levels=1, deform_ratio=1.0,
+#                  norm_layer=partial(nn.LayerNorm, eps=1e-6), init_values=0., with_cp=False):
+#         super().__init__()
+#         self.with_cp = with_cp
+#         self.query_norm = norm_layer(dim)
+#         self.feat_norm = norm_layer(dim)
+#         self.attn = MSDeformAttn(d_model=dim, n_levels=n_levels, n_heads=num_heads,
+#                                  n_points=n_points, ratio=deform_ratio)
+#         self.gamma = nn.Parameter(init_values * torch.ones((dim)), requires_grad=True)
 
-    def forward(self, query, reference_points, feat, spatial_shapes, level_start_index):
+#     def forward(self, query, reference_points, feat, spatial_shapes, level_start_index):
         
-        a=1
-        def _inner_forward(query, feat):
+#         a=1
+#         def _inner_forward(query, feat):
 
-            attn = self.attn(self.query_norm(query), reference_points,
-                             self.feat_norm(feat), spatial_shapes,
-                             level_start_index, None)
-            return query + self.gamma * attn
+#             attn = self.attn(self.query_norm(query), reference_points,
+#                              self.feat_norm(feat), spatial_shapes,
+#                              level_start_index, None)
+#             return query + self.gamma * attn
         
-        if self.with_cp and query.requires_grad:
-            query = cp.checkpoint(_inner_forward, query, feat)
-        else:
-            query = _inner_forward(query, feat)
+#         if self.with_cp and query.requires_grad:
+#             query = cp.checkpoint(_inner_forward, query, feat)
+#         else:
+#             query = _inner_forward(query, feat)
             
-        return query
+#         return query
 
 class Injector_1(nn.Module):
     def __init__(self, dim, num_heads=6, n_points=4, n_levels=1, deform_ratio=1.0,

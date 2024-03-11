@@ -226,7 +226,9 @@ def generate_experiment_cfgs(id):
         a=1
 
         # Setup UDA config
-        cfg["wandb_project"] = "Hamlet"
+        cfg["wandb_project"] = wandb_project
+        # cfg["wandb_project"] = "Hamlet-ACDC"
+        # cfg["wandb_project"] = "Hamlet"
         cfg["mode"] = uda
         if uda == "target-only":
             cfg["_base_"].append(f"_base_/datasets/{target}_half_{crop}.py")
@@ -345,7 +347,9 @@ def generate_experiment_cfgs(id):
             cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings.py")
             # wandb tags
             name_ds = target
-            cfg["wandb_project"] = "Hamlet"
+            cfg["wandb_project"] = wandb_project
+            # cfg["wandb_project"] = "Hamlet-ACDC"
+            # cfg["wandb_project"] = "Hamlet"
             cfg["domain_order"] = domain_order
             cfg["epoch_domain"] = num_epochs[0]
             mode = "online"
@@ -574,8 +578,15 @@ def generate_experiment_cfgs(id):
         cfg = config_from_vars()
         cfgs.append(cfg)
 
-    elif id == -1:
-        import config_custom as config
+    # elif id == -1:
+    elif id < 0:
+        if id == -2:
+            import config_acdc as config
+        elif id == -1:
+            import config_rainy as config
+        else:
+            import sys
+            sys.exit()
 
         seeds = config.seed
         datasets = config.datasets
@@ -622,6 +633,7 @@ def generate_experiment_cfgs(id):
         #!DEBUG
         freeze_backbone = config.freeze_backbone
         pmult = config.pmult
+        wandb_project = config.wandb_project
 
         if config.modules_update is not None:
             modules_update = config.modules_update

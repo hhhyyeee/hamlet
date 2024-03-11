@@ -5,7 +5,7 @@
 dataset_type = 'ACDCDataset'
 data_root = '/data/datasets/ACDC/'
 img_norm_cfg = dict(
-    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)           #?
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 crop_size = (512, 512)                                                                  #?
 train_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -42,21 +42,21 @@ data = dict(
     workers_per_gpu=4,
     train=dict(
         type=dataset_type,
-        domain=0,
+        domain=1,
         data_root=data_root,
         img_dir='rgb_anon/fog/train',
         ann_dir='data/ACDC/gt/fog/train',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        name='clear',
+        name='fog',
         data_root=data_root,
         img_dir='rgb_anon/fog/val',
         ann_dir='data/ACDC/gt/fog/val',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        name='clear',
+        name='fog',
         data_root=data_root,
         img_dir='rgb_anon/fog/val',
         ann_dir='data/ACDC/gt/fog/val',

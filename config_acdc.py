@@ -1,36 +1,49 @@
-datasets = [
-    ("cityscapes", "rain"),
-    # ('shift', 'shift'),
+wandb_project = "Hamlet-ACDC"
+
+datasets = [ # (source, target)
+    ("cityscapes", "acdc")
 ]
 
-# domain_order = [
-#     ["clear"]
-# ]
-# num_epochs = 1
 domain_order = [
-    ["clear", "25mm", "50mm", "75mm", "100mm", "200mm"] + ["100mm", "75mm", "50mm", "25mm", "clear"]
+    # ["fog"]
+    ["fog", "night", "rain", "snow"] + ["rain", "night", "fog"]
 ]
-num_epochs = 3
+num_epochs = 10
 
 models = [ # (architecture, backbone)
     # ("segformer", "mitb0_custom"),
     # ("segformer", "mitb1_custom"),
     # ("segformer", "mitb0_custom_adpt1"),
+
     # ("segformer", "mitb1_custom_adpt1"),
     # ("segformer", "mitb1_custom_adpt2"),
-    ("segformer", "mitb1_custom_adpt3"),
+    # ("segformer", "mitb1_custom_adpt3"),
+    # ("segformer", "mitb1_custom_adpt3-false"),
     # ("segformer", "mitb1_custom_adpt4"),
     # ("segformer", "mitb1_custom_adpt5-debug"),
     # ("segformer", "mitb1_custom_adpt6"),
     # ("segformer", "mitb1_custom_adpt7"),
     # ("segformer", "mitb1_custom_adpt8"),
+    # ("segformer", "mitb1_custom_adpt8-debug"),
+    # ("segformer", "mitb1_custom_adpt9"),
+
     # ("segformer", "mitb2_custom_adpt1"),
     # ("segformer", "mitb2_custom_adpt3"),
+    # ("segformer", "mitb2_custom_adpt8"),
+
     # ("segformer", "mitb3_custom_adpt1"),
     # ("segformer", "mitb3_custom_adpt3"),
     # ("segformer", "mitb3_custom_adpt4"),
+    ("segformer", "mitb3_custom_adpt8"),
     # ("segformer", "mitb3_custom"),
+
+    # ("segformer", "mitb5_custom_adpt1"),
+    # ("segformer", "mitb5_custom_adpt2"),
+    # ("segformer", "mitb5_custom_adpt3"),
+    # ("segformer", "mitb5_custom_adpt4"),
+    # ("segformer", "mitb5_custom_adpt8"),
     # ("segformer", "mitb5_custom"),
+
     # ("segformer", "mitb1")
     # ("segformer", "mitb5")
     # ("upernet", "swin")
@@ -46,9 +59,9 @@ max_lr = [
 
 lr = [
     # 6e-5
-    # 0.00015,
+    0.00015,
+    # 0.000075,
     # 0.000015,
-    0.00015
 ]
 
 lr_policy = [
@@ -123,12 +136,18 @@ modules_update = "random_modules/online_random.npy"
 # pretrained_segmentator = "pretrained/mit_b5.pth"
 # pretrained_segmentator = "pretrained/segformer.b0.1024x1024.city.160k.replace.pth"
 # pretrained_segmentator = "pretrained/segformer.b1.1024x1024.city.160k.pth"
-pretrained_segmentator = "pretrained/segformer.b1.1024x1024.city.160k.replace.pth"
+# pretrained_segmentator = "pretrained/segformer.b1.1024x1024.city.160k.replace.pth"
 # pretrained_segmentator = "pretrained/segformer.b2.1024x1024.city.160k.replace.pth"
 # pretrained_segmentator = "pretrained/segformer.b3.1024x1024.city.160k.replace.pth"
 # pretrained_segmentator = "pretrained/segformer.b5.1024x1024.city.160k.pth"      #segformer (evaluation)
+# pretrained_segmentator = "pretrained/segformer.b5.1024x1024.city.160k.replace.pth"
 # pretrained_segmentator = "pretrained/upernet_swin_tiny_patch4_window7_512x512.pth"
-student_pretrained = pretrained_segmentator
+# pretrained_segmentator = "/workspace/hamlet-pretraining/temp.pth"
+
+# student_pretrained = pretrained_segmentator
+
+pretrained_segmentator = "pretrained/mit_b3.replace.pth"
+student_pretrained = "pretrained/segformer.b3.1024x1024.city.160k.replace.pth"
 
 seed = [0]
 perfect_determinism = False

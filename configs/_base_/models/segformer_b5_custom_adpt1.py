@@ -13,7 +13,8 @@ model = dict(
         type='mit_b5',
         style='pytorch',
         pet_cls='Adapter',
-        adapt_blocks=[0, 1]
+        adapt_blocks=[0, 1],
+        aux_classifier=False
         ),
     decode_head=dict(
         type='OriginalSegFormerHead',
