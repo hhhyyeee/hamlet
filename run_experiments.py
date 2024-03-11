@@ -18,7 +18,7 @@ from mmcv import Config, get_git_hash
 # from mmseg.apis import set_random_seed
 from tools import train
 
-DEBUG = True
+DEBUG = False
 
 
 def run_command(command):
