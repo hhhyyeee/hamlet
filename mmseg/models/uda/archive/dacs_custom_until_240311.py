@@ -120,8 +120,6 @@ class DACS(CustomUDADecorator):
             from mmseg.models.utils import freeze #!DEBUG
             freeze(self.model.backbone)
             freeze(self.ema_model.backbone)
-        
-        self.target_only = cfg.get("target_only", None)
 
     def get_ema_model(self):
         return get_module(self.ema_model)
@@ -419,14 +417,21 @@ class DACS(CustomUDADecorator):
                 m.training = False
             if isinstance(m, DropPath):
                 m.training = False
+        # ema_logits = self.get_ema_model().encode_decode(target_img, target_img_metas)
         if target_gt_semantic_seg is not None:
+            # ema_logits = target_gt_semantic_seg.float()
+            # ema_softmax = target_gt_semantic_seg.float()
+            # pseudo_prob, pseudo_label = torch.max(ema_softmax, dim=1)
             pseudo_prob = torch.max(target_gt_semantic_seg, dim=1)[0]
             pseudo_label = pseudo_prob
         else:
             ema_logits = self.get_ema_model().encode_decode(target_img, target_img_metas)
             ema_softmax = torch.softmax(ema_logits.detach(), dim=1)
             pseudo_prob, pseudo_label = torch.max(ema_softmax, dim=1)
+        # ema_logits = self.get_ema_model().get_target_gt_seg(target_img, target_img_metas)
 
+        # ema_softmax = torch.softmax(ema_logits.detach(), dim=1)
+        # pseudo_prob, pseudo_label = torch.max(ema_softmax, dim=1)
         ps_large_p = pseudo_prob.ge(self.pseudo_threshold).long() == 1
         ps_size = np.size(np.array(pseudo_label.cpu()))
         pseudo_weight = torch.sum(ps_large_p).item() / ps_size
@@ -458,10 +463,6 @@ class DACS(CustomUDADecorator):
             )
         mixed_img = torch.cat(mixed_img)
         mixed_lbl = torch.cat(mixed_lbl)
-
-        if (self.target_only is not None) and (self.target_only == True):
-            mixed_img = target_img
-            mixed_lbl = pseudo_label.unsqueeze(1)
 
         # Train on mixed images
         mix_losses = self.get_model().forward_train(
@@ -520,10 +521,7 @@ class DACS(CustomUDADecorator):
             vis_mixed_img = torch.clamp(denorm(mixed_img, means, stds), 0, 1)
 
             #  get 200mm images
-            if any(
-                [(v in target_img_metas[0]["filename"]) \
-                for v in ["200m", "fog", "night", "rain", "snow"]]):
-            # if ("200m" in target_img_metas[0]["filename"]) or ("night" in target_img_metas[0]["filename"]):
+            if "200m" in target_img_metas[0]["filename"]:
                 #  target
                 def plot_img(img, metas, domain):
                     img = img[0].cpu()

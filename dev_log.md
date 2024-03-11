@@ -738,5 +738,195 @@ backprop에서 에러가 나는거보니 뭔가 그래프가 이상하게 만들
     - ops.MultiScaleDeformableAttention를 사용하기 위해서는 높은 버전의 mmcv를 사용해야 하는데 mmcv 1.4.0에서는 지원하지 않았음
     - 문제가 발생하기 전까지 mmcv 1.7.2를 사용하기로 결정
 
+## MiT B1 Pretrained Decoder 채널 사이즈 문제
+앞선 문제를 해결하고 실험을 돌리려고 했더니 MiT B1 백본 (`mitb1_custom_adpt3`)에 pretrained weights가 잘 안 입혀지는 것을 발견했음.
+알고보니 mit b0~1은 decoder hidden dim이 256, mit b2~5는 768인데 model config를 로드할 때 b1도 b5의 세팅을 읽어오는 바람에 생긴 문제였음.
+
+* `experiments_custom.py`
+    ```
+    if "segformer" in architecture:
+        if "custom" in backbone:        #!DEBUG
+            if "adpt" in backbone:      #!DEBUG
+                backbone_, _, adapt = backbone.split("_")
+                return {
+                    "mitb5": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                    # It's intended that <=b4 refers to b5 config
+                    "mitb4": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                    "mitb3": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                    "mitb2": f"_base_/models/{architecture}_b5_custom_{adapt}.py",
+                    "mitb1": f"_base_/models/{architecture}_b0_custom_{adapt}.py", #이부분이 원래 b5였는데 b0로 변경
+                    "mitb0": f"_base_/models/{architecture}_b0_custom_{adapt}.py",
+                }[backbone_]
+    ```
+    - git log: 8a691c8e3d6fd0d0a65f7f507be0bfb9d2842aae
+
+# 240131
+## mmcv-injector 운용에 따른 성능 저하 탐구
+* `mmseg/models/backbones/mix_transformer_adapter_auxclf.py`
+    ```
+    # (+) stage 1-3: fusion (INJECTOR?)
+    a=1
+    # x = self.injector(query=x, feat=c, H=H, W=W)
+    x = self.injector(query=x, reference_points=deform_inputs1[0], feat=c,
+                        spatial_shapes=deform_inputs1[1], level_start_index=deform_inputs1[2])
+
+    # x = x + c3 #!DEBUG
+    ```
+    디버깅을 위해서 붙여놨던 `x = x + c3` 라인 때문에 성능 저하가 일어난 것 같다는 강력한 의심
+
+## MiT B0 decode_head in_channels 문제
+어제 pretrained channel size 문제가 발생하여 해결책으로 B1의 경우에는 `configs/_base_/models/segformer_b0_custom_adpt3.py`를 쓰도록 함.
+하지만 decode_head의 in_channels는 MiT B1 세팅에 맞춰 [64, 128, 320, 512]로 고정되어야 하는 상황.
+따라서 configs 내부의 segformer b0, b1 세팅 파일을 분리해야 할 듯.
+
+
+# 240206
+## Decoder에 STEM output 붙여서 실험
+* `mmseg/models/decode_heads/archive/decodesc_segformer_head_230206_01.py`
+    - channel을 105에서 768로 바꾸려니 파라미터 개수가 너무 많이 늘어난다
+    - 실험: `240201_0145_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt6_fixed_s0_bf62b`
+        - 테스트 코드 잘못써서 fail
+        - 알고보니 train이랑 test 시의 이미지 사이즈가 다르다 ㅅㅂ
+* `mmseg/models/decode_heads/archive/decodesc_segformer_head_230206_02.py`
+    - 실험 1) `240206_1004_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt7_fixed_s0_92f40`
+        - decoder embed_dim 768, learning rate 0.000015
+    - 실험 2) `240206_1515_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt8_fixed_s0_5f633`
+        - decoder embed_dim 256, learning rate 0.000015
+    - 실험 3) `240206_1521_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt8_fixed_s0_75441`
+        - decoder embed_dim 256, learning rate 0.00015
+
+
+# 240216
+## mix loss, clean loss 비율 실험
+* `mmseg/models/uda/dacs_custom.py`
+    ```
+    (0.3 * clean_loss + 0.7 * mix_loss).backward()
+    ```
+    - 실험 1) `240216_1334_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt3_fixed_s0_d163a`
+        - learning rate 0.00015
+    - 실험 2) `240216_2359_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt3_fixed_s0_70695`
+        - learning rate 0.000015
+    - 실험 3) `240217_1059_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt3_fixed_s0_0f467`
+        - learning rate 0.000075
+    ```
+    (0.75 * clean_loss + 1.25 * mix_loss).backward()
+    ```
+    - 실험 1) `240218_0729_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt3_fixed_s0_566ce`
+        - learning rate 0.00015
+
+
+# 240222
+## ground truth mix loss 계산 실험 (1)
+* `mmseg/models/uda/dacs_custom.py`
+    ```
+    # ema_logits = self.get_ema_model().encode_decode(target_img, target_img_metas)
+    ema_logits = self.get_ema_model().get_target_gt_seg(target_img, target_img_metas)
+    
+    ...
+
+    (clean_loss + mix_loss).backward()
+    ```
+    - 상세
+        - dataset 건드리기 싫어서 그냥 매번 해당하는 target gt segmentation map을 불러오는 형태
+        - 실험해보니 제대로 된 파일을 불러오기는 하나, transform pipeline이 달라서 결론적으로는 이상한 라벨이 불러와짐 (실패)
+    - 실험 1) `240222_0509_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt8_fixed_s0_29f88`
+        - learning rate 0.00015
+        - FAILED
+    - 실험 2) `240222_0748_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt8_fixed_s0_741fe`
+        - learning rate 0.00015
+        - 편법으로는 안된다는 것을 꺠닫고 정공법으로 승부하기로 함
+
+## ground truth mix loss 계산 실험 (2)
+* `mmseg/models/uda/dacs_custom.py`
+    ```
+    target_gt_semantic_seg = kwargs.get("target_gt_semantic_seg", None)
+
+    ...
+
+    def forward_train(self, img, img_metas, gt_semantic_seg, target_img, target_img_metas, **kwargs):
+        ...
+        # ema_logits = self.get_ema_model().encode_decode(target_img, target_img_metas)
+        if target_gt_semantic_seg is not None:
+            ema_logits = target_gt_semantic_seg.float()
+        else:
+            ema_logits = self.get_ema_model().encode_decode(target_img, target_img_metas)
+        # ema_logits = self.get_ema_model().get_target_gt_seg(target_img, target_img_metas)
+    ```
+    - 상세
+        - dataset을 건드림
+        - 살펴보니 CityScapes 데이터셋은 CustomDataset을 상속하고 있고, 전부 실제로는 target_gt_semantic_map이라는 segmentation map을 반환하고 있었음
+        - 중간 과정들 (`mmseg.apis.train`, `online_src.online_runner` 등)에서는 전부 data_batch라는 딕셔너리로 데이터들을 전부 wrap해서 넘기고 있기 때문에, target_gt_semantic_map을 하나쯤 추가해도 문제 없을 것으로 판단함
+        - data_batch를 parameter로 받는 `dacs_custom.forward_train` 함수의 arguments에 kwargs를 추가함
+    - 실험 1) `240222_1251_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt8_fixed_s0_8898b`
+        - learning rate 0.00015
+        - FAILED
+
+## ground truth mix loss 계산 실험 (3)
+* `mmseg/models/uda/dacs_custom.py`
+    ```
+    # ema_logits = self.get_ema_model().encode_decode(target_img, target_img_metas)
+    if target_gt_semantic_seg is not None:
+        # ema_logits = target_gt_semantic_seg.float()
+        # ema_softmax = target_gt_semantic_seg.float()
+        # pseudo_prob, pseudo_label = torch.max(ema_softmax, dim=1)
+        pseudo_prob = torch.max(target_gt_semantic_seg, dim=1)[0]
+        pseudo_label = pseudo_prob
+    else:
+        ema_logits = self.get_ema_model().encode_decode(target_img, target_img_metas)
+        ema_softmax = torch.softmax(ema_logits.detach(), dim=1)
+        pseudo_prob, pseudo_label = torch.max(ema_softmax, dim=1)
+    # ema_logits = self.get_ema_model().get_target_gt_seg(target_img, target_img_metas)
+
+    # ema_softmax = torch.softmax(ema_logits.detach(), dim=1)
+    # pseudo_prob, pseudo_label = torch.max(ema_softmax, dim=1)
+    ps_large_p = pseudo_prob.ge(self.pseudo_threshold).long() == 1
+    ps_size = np.size(np.array(pseudo_label.cpu()))
+    pseudo_weight = torch.sum(ps_large_p).item() / ps_size
+    pseudo_weight = pseudo_weight * torch.ones(pseudo_prob.shape, device=dev)
+    ```
+    - 상세
+        - 잘 살펴보니 torch.max를 취하는 과정에서 라벨이 뭉개진다는 것을 발견함
+        - 따라서 해당 코드를 고쳐서 다시 실험
+    - 실험 1) `240223_2229_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt8_fixed_s0_7547b`
+        - learning rate 0.00015
+
+
+# 240226
+## 
+* ``
+    - 실험 1) `240226_0128_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt8-debug_fixed_s0_c37ed`
+        - mlp adapter 모두 삭제
+
+
+# 240228
+## model 규모와 capacity 간의 상관관계 실험
+* `online_src/online_runner.py`
+    ```
+    data_batch = {
+        **source_data,
+        "target_img_metas": target_data["img_metas"],
+        "target_img": target_data["img"],
+        # "target_gt_semantic_seg": target_data["gt_semantic_seg"] #! when training with GT (supervised)
+    }
+    ```
+    - 상세
+        - mit b3로 규모 키워서 실험
+        - GT / pseudo label로 각각 실험
+        - 일단 똑같이 adpt8로 실험
+    - 실험 1) `240228_0130_cs2rain_dacs_online_rcs001_cpl_segformer_mitb3_custom_adpt8_fixed_s0_fce9c`
+        - 평범한 mix loss
+    - 실험 2) `240228_0138_cs2rain_dacs_online_rcs001_cpl_segformer_mitb3_custom_adpt8_fixed_s0_5e762`
+        - GT로 mix loss
+    - 결과분석
+        1) 왜 실험 1, 2 스코어에 큰 차이가 없을까?
+            - clear 도메인에서는 teacher 모델 성능이 좋음. 생각해보니 GT로 학습했을 때 개선이 보여야 하는 부분은 100mm~200mm 쪽, domain gap이 큰 쪽이어야 할 것 같음.
+            - 그런데 B1 비교 실험 (`240206_1521_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt8_fixed_s0_75441`, `240223_2229_cs2rain_dacs_online_rcs001_cpl_segformer_mitb1_custom_adpt8_fixed_s0_7547b`) 에서는 100mm~200mm에서도 성능 차이가 크지 않았음.
+                - 시각화해서 보니 비가 많이 오는 도메인이어도 1) pseudo label의 정확도가 크게 낮아지지 않았고, 2) mix image를 만드는 과정에서 target 라벨의 떨어지는 정확도가 source 라벨로 보완이 많이 되었음.
+                - notebook: http://203.255.177.167:529/lab/tree/hamlet/notebooks/S00032/02_class_mix_debug.ipynb
+            - B3 실험은 아직 진행중이지만, 이르게 결론을 내리자면 GT로 학습한 것에 비해 teacher의 pseudo label 생성 능력에는 크게 문제가 없어 보인다. 다만 이것은 pseudo label에 대한 정량적인 퀄리티를 측정할 수 없기 때문에 논란의 여지가 있다. 참고로, GT는 target 이미지의 도메인 변화를 모델에 반영해줄 수 없기 때문에 오히려 teacher의 pseudo label이 더 좋은 결과를 보일 가능성도 있다.
+
+
+
+
 
 
