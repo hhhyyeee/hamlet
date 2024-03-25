@@ -189,6 +189,13 @@ def generate_experiment_cfgs(id):
             "pretrained": get_pretraining_file(backbone),
             "backbone": get_backbone_cfg(backbone),
         }
+        if imnet_original is not None:
+            cfg["imnet_original"] = {
+                "pretrained": get_pretraining_file(imnet_original),
+                "backbone": get_backbone_cfg(imnet_original),
+                "decode_head": {}
+            }
+            cfg["_base_"].append(f"_base_/models/segformer_b5_custom.imnet.py") #!DEBUG
 
         loss_weight = [0, 0, 0, 1] if not train_lightweight_decoder else [1, 0, 0, 0]
 
@@ -344,7 +351,8 @@ def generate_experiment_cfgs(id):
                 threshold_indicator=threshold_indicator,
                 mode_train=mode_train,
             )
-            cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings.py")
+            # cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings.py")
+            cfg["_base_"].append(f"_base_/uda/dacs_a999_fd.py")
             # wandb tags
             name_ds = target
             cfg["wandb_project"] = wandb_project
@@ -569,6 +577,7 @@ def generate_experiment_cfgs(id):
     seed = 0
 
     freeze_backbone = False #!DETERMINED
+    imnet_original = False
 
     # -------------------------------------------------------------------------
     # Config experiments:
@@ -632,6 +641,7 @@ def generate_experiment_cfgs(id):
 
         #!DEBUG
         freeze_backbone = config.freeze_backbone
+        imnet_original = config.__dict__.get("imnet_original", None)
         pmult = config.pmult
         wandb_project = config.wandb_project
 
