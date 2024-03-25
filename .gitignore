@@ -137,6 +137,7 @@ random_modules/
 .efficient_test
 
 #!CUSTOM
+*.zip
 configs/_base_/datasets_orig/
 deprecated/
 notebooks/

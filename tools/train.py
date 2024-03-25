@@ -162,7 +162,7 @@ def main(args):
     meta['seed'] = args.seed
     meta['exp_name'] = osp.splitext(osp.basename(args.config))[0]
 
-    # ----- Build Training Model (default)
+    # ----- Build Training Model
     model = build_train_model(
         cfg, train_cfg=cfg.get('train_cfg'), test_cfg=cfg.get('test_cfg'))
     if ('uda' not in cfg or not 'segmentator_pretrained' in cfg['uda']) and cfg['segmentator_pretrained'] is None:
