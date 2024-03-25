@@ -112,4 +112,76 @@ class OthersEncoderDecoder(EncoderDecoder):
 
         return {f"confidence": conf, "entropy": entr}
 
+    # #!DEBUG
+    # def rgb_to_one_hot(self, rgb_map, class_rgb_values=PALETTE):
+    #     """
+    #     Convert RGB label map to one-hot encoded multi-channel tensor using broadcasting.
+
+    #     Args:
+    #         rgb_map (Tensor): RGB label map tensor with shape (height, width, 3).
+    #         class_rgb_values (List[Tuple[int, int, int]]): List of RGB values for each class.
+
+    #     Returns:
+    #         Tensor: One-hot encoded label tensor with shape (height, width, num_classes).
+    #     """
+    #     height, width, _ = rgb_map.shape
+    #     num_classes = len(class_rgb_values)
+
+    #     # Convert RGB map tensor to a tensor of shape (height, width, 1, 3)
+    #     rgb_map_tensor = rgb_map.unsqueeze(2)
+
+    #     # Convert class RGB values to a tensor of shape (1, 1, num_classes, 3)
+    #     class_rgb_tensor = torch.tensor(class_rgb_values, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+
+    #     # Compute element-wise equality between the RGB map tensor and class RGB tensor
+    #     equality = (rgb_map_tensor == class_rgb_tensor)
+
+    #     # Reduce along the last dimension to get one-hot encoded tensor
+    #     one_hot_labels = equality.all(dim=-1).float()
+
+    #     return one_hot_labels
+
+    # def get_target_gt_seg(self, img, img_metas):
+
+    #     """
+    #     sample :: img_metas
+    #         [
+    #             {
+    #                 'filename': '/data/datasets/Cityscapes/leftImg8bit/train/bremen/bremen_000243_000019_leftImg8bit.png',
+    #                 'ori_filename': 'bremen/bremen_000243_000019_leftImg8bit.png',
+    #                 'ori_shape': (1024, 2048, 3), 'img_shape': (512, 512, 3),
+    #                 'pad_shape': (512, 512, 3),
+    #                 'scale_factor': array([0.5, 0.5, 0.5, 0.5], dtype=float32),
+    #                 'flip': False,
+    #                 'flip_direction': 'horizontal',
+    #                 'img_norm_cfg': {
+    #                     'mean': array([123.675, 116.28 , 103.53 ], dtype=float32),
+    #                     'std': array([58.395, 57.12 , 57.375], dtype=float32), 'to_rgb': True
+    #                 }
+    #             }
+    #         ]
+    #     """
+
+    #     seg_list = []   
+    #     for _meta in img_metas:
+    #         img_filepath = _meta["filename"]
+    #         if "weather_datasets" in img_filepath:
+    #             gt_filename = os.path.basename(img_filepath).replace('leftImg8bit', 'gtFine_color')
+    #             gt_filepath = os.path.join("/data/datasets/Cityscapes/gtFine/train", gt_filename.split('_')[0], gt_filename)
+    #         else:
+    #             gt_filename = os.path.basename(img_filepath).replace('leftImg8bit', 'gtFine_color')
+    #             gt_filepath = os.path.dirname(img_filepath).replace('leftImg8bit', 'gtFine') + '/' + gt_filename
+
+    #         assert os.path.isfile(gt_filepath), f"no target seg map :< {gt_filepath}"
+
+    #         seg_map = torchvision.io.read_image(gt_filepath, torchvision.io.ImageReadMode.RGB)
+
+    #         resize_transform = torchvision.transforms.Resize(_meta["img_shape"][:2])
+    #         seg_map = resize_transform(seg_map)
+
+    #         seg_map = self.rgb_to_one_hot(seg_map.permute(1, 2, 0))
+    #         seg_list.append(seg_map.permute(2, 0, 1))
+
+    #     return torch.stack(seg_list, 0).to("cuda")
+
 

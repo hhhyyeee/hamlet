@@ -59,6 +59,7 @@ def build_train_model(cfg, train_cfg=None, test_cfg=None):
             cfg.others, default_args=dict(train_cfg=train_cfg, test_cfg=test_cfg))
     elif "custom" in cfg:
         cfg.custom["model"] = cfg.model
+        cfg.custom["imnet_model"] = cfg.get("imnet_model", None)
         return UDA.build(
             cfg.custom, default_args=dict(train_cfg=train_cfg, test_cfg=test_cfg)
         )

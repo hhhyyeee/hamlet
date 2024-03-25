@@ -263,7 +263,6 @@ class MixVisionTransformer(BaseModule):
 
             self.level_embed = nn.Parameter(torch.zeros(3, _embed_dim))
             normal_(self.level_embed)
-
         # --- custom decoder
         self.decoder_custom = "decoder_custom" in cfg
         a=1
