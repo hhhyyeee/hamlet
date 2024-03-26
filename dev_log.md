@@ -926,6 +926,53 @@ backprop에서 에러가 나는거보니 뭔가 그래프가 이상하게 만들
             - B3 실험은 아직 진행중이지만, 이르게 결론을 내리자면 GT로 학습한 것에 비해 teacher의 pseudo label 생성 능력에는 크게 문제가 없어 보인다. 다만 이것은 pseudo label에 대한 정량적인 퀄리티를 측정할 수 없기 때문에 논란의 여지가 있다. 참고로, GT는 target 이미지의 도메인 변화를 모델에 반영해줄 수 없기 때문에 오히려 teacher의 pseudo label이 더 좋은 결과를 보일 가능성도 있다.
 
 
+# 240311
+## DACS: Mixed image 삭제하고 target image로만 mix_loss 계산하기
+* `mmseg/models/uda/dacs_custom.py`
+    ```
+    self.target_only = cfg.get("target_only", None)
+
+    ...
+
+    if (self.target_only is not None) and (self.target_only == True):
+        mixed_img = target_img
+        mixed_lbl = pseudo_label.unsqueeze(1)
+    ```
+    - `target_only` 라는 변수를 `configs/_base_/models/uda/dacs_a999_fdthings.py`에서 선언
+
+# 240312
+## DACS: ImageNet Feature Distance 계산 (target student <-> target imnet)
+* `mmseg/models/uda/dacs_custom.py`
+    ```
+    self.target_fdist_lambda = cfg.get("imnet_feature_dist_target_lambda", 0) #!DEBUG
+    self.enable_target_fdist = self.target_fdist_lambda > 0
+
+    if (self.enable_fdist or self.enable_target_fdist):
+    # if self.enable_fdist:
+        self.imnet_model = build_segmentor(deepcopy(cfg["model"]))
+    else:
+        self.imnet_model = None
+
+    ...
+
+    # ImageNet `Target` feature distance
+    if self.enable_target_fdist:
+        feat_loss, feat_log = self.calc_target_feat_dist(target_img, pseudo_label.unsqueeze(1), mix_feat)
+        log_vars.update(add_prefix(feat_log, "target_imnet"))
+        if self.print_grad_magnitude:
+            params = self.get_model().backbone.parameters()
+            fd_grads = [p.grad.detach() for p in params if p.grad is not None]
+            fd_grads = [g2 - g1 for g1, g2 in zip(seg_grads, fd_grads)]
+            grad_mag = calc_grad_magnitude(fd_grads)
+            mmcv.print_log(f"Target Fdist Grad.: {grad_mag}", "mmseg")
+    ```
+    - 상세
+        - `imnet_feature_dist_target_lambda` 라는 변수를 `configs/_base_/models/uda/dacs_a999_fdthings.py`에서 선언
+        - 이때 source와의 fdist에서와는 달리 things-class feature distance 구현이 불가 (GT가 없으므로)
+        - 따라서 자연히 `imnet_feature_dist_classes`은 None으로 넣어야 할듯
+    - 테스트 1) `240312_0626_cs2acdc_dacs_online_rcs001_cpl_segformer_mitb5_custom_adpt8_fixed_s0_b5c3a`
+
+
 
 
 
