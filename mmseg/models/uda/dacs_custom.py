@@ -86,9 +86,12 @@ class DACS(CustomUDADecorator):
         ema_cfg = deepcopy(cfg["model"])
         self.ema_model = build_segmentor(ema_cfg)
 
+        self.target_fdist_lambda = cfg.get("imnet_feature_dist_target_lambda", 0)
+        self.enable_target_fdist = self.target_fdist_lambda > 0
+
         self.imnet_orig_flag = cfg.get("imnet_model", None) is not None
 
-        if self.enable_fdist:
+        if (self.enable_fdist or self.enable_target_fdist):
             if not self.imnet_orig_flag:
                 self.imnet_model = build_segmentor(deepcopy(cfg["model"]))
             else:
@@ -119,12 +122,15 @@ class DACS(CustomUDADecorator):
 
         self.dacs_ratio = self.fixed_dacs = 0.5
         self.use_domain_indicator = cfg["use_domain_indicator"]
- 
+
         a=1
         if cfg["freeze_backbone"]:
             from mmseg.models.utils import freeze #!DEBUG
             freeze(self.model.backbone)
             freeze(self.ema_model.backbone)
+
+        self.target_only = cfg.get("target_only", None)
+
 
     def get_ema_model(self):
         return get_module(self.ema_model)
@@ -339,6 +345,24 @@ class DACS(CustomUDADecorator):
         feat_log.pop("loss", None)
         return feat_loss, feat_log
 
+    def calc_target_feat_dist(self, img, gt=None, feat=None):
+        assert self.enable_target_fdist
+        with torch.no_grad():
+            self.get_imnet_model().eval()
+            feat_imnet = self.get_imnet_model().extract_feat(img)
+            if self.get_model().decodesc_flag:
+                # decodesc mode - output looks like (outs, (c1, c2, c3, c4, c))
+                # we only need `outs` here, nothing else
+                feat_imnet = feat_imnet[0]
+            feat_imnet = [f.detach() for f in feat_imnet]
+        lay = -1  # if not self.modular_model else self.num_module - 1
+
+        feat_dist = self.masked_feat_dist(feat[lay], feat_imnet[lay])
+        feat_dist = self.target_fdist_lambda * feat_dist
+        feat_loss, feat_log = self._parse_losses({"loss_imnet_feat_dist": feat_dist})
+        feat_log.pop("loss", None)
+        return feat_loss, feat_log
+
     # @profile
     def forward_train(self, img, img_metas, gt_semantic_seg, target_img, target_img_metas, **kwargs):
         """Forward function for training.
@@ -469,6 +493,10 @@ class DACS(CustomUDADecorator):
         mixed_img = torch.cat(mixed_img)
         mixed_lbl = torch.cat(mixed_lbl)
 
+        if (self.target_only is not None) and (self.target_only == True):
+            mixed_img = target_img
+            mixed_lbl = pseudo_label.unsqueeze(1)
+
         # Train on mixed images
         mix_losses = self.get_model().forward_train(
             mixed_img,
@@ -479,10 +507,21 @@ class DACS(CustomUDADecorator):
             # module=main_model,
             # confidence=True,
         )
-        mix_losses.pop("features")
+        mix_feat = mix_losses.pop("features")
         mix_losses = add_prefix(mix_losses, "mix")
         mix_loss, mix_log_vars = self._parse_losses(mix_losses, mode=self.current_weight)
         log_vars.update(mix_log_vars)
+
+        # ImageNet `Target` feature distance
+        if self.enable_target_fdist:
+            feat_loss, feat_log = self.calc_target_feat_dist(target_img, pseudo_label.unsqueeze(1), mix_feat)
+            log_vars.update(add_prefix(feat_log, "target_imnet"))
+            if self.print_grad_magnitude:
+                params = self.get_model().backbone.parameters()
+                fd_grads = [p.grad.detach() for p in params if p.grad is not None]
+                fd_grads = [g2 - g1 for g1, g2 in zip(seg_grads, fd_grads)]
+                grad_mag = calc_grad_magnitude(fd_grads)
+                mmcv.print_log(f"Target Fdist Grad.: {grad_mag}", "mmseg")
 
         # confidence of the student of the target and simulate prediction
         self.get_model().eval()
@@ -512,6 +551,8 @@ class DACS(CustomUDADecorator):
         # backward pass
         if self.enable_fdist:
             (clean_loss + feat_loss + mix_loss).backward()
+        elif self.enable_target_fdist:
+            (feat_loss + mix_loss).backward()
         else:
             (clean_loss + mix_loss).backward()
             # (0.3 * clean_loss + 0.7 * mix_loss).backward()

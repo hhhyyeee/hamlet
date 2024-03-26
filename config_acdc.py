@@ -39,9 +39,9 @@ models = [ # (architecture, backbone)
     # ("segformer", "mitb3_custom"),
     
     # ("segformer", "mitb5_custom_adpt1"),
-    # ("segformer", "mitb5_custom_adpt2"),
+    ("segformer", "mitb5_custom_adpt2"),
     # ("segformer", "mitb5_custom_adpt3"),
-    ("segformer", "mitb5_custom_adpt4"),
+    # ("segformer", "mitb5_custom_adpt4"),
     # ("segformer", "mitb5_custom_adpt5"),
     # ("segformer", "mitb5_custom_adpt8"),
     # ("segformer", "mitb5_custom"),
@@ -143,8 +143,6 @@ modules_update = "random_modules/online_random.npy"
 # pretrained_segmentator = "pretrained/segformer.b3.1024x1024.city.160k.replace.pth"
 # pretrained_segmentator = "pretrained/segformer.b5.1024x1024.city.160k.replace.pth"
 # pretrained_segmentator = "pretrained/segformer.b5.1024x1024.city.160k.pth"      #segformer (evaluation)
-# pretrained_segmentator = "pretrained/upernet_swin_tiny_patch4_window7_512x512.pth"
-# pretrained_segmentator = "/workspace/hamlet-pretraining/temp.pth"
 
 # student_pretrained = pretrained_segmentator
 
@@ -152,8 +150,8 @@ modules_update = "random_modules/online_random.npy"
 # student_pretrained = "pretrained/segformer.b1.1024x1024.city.160k.replace.pth"
 
 pretrained_segmentator = "pretrained/mit_b5.replace.pth"
-student_pretrained = "work_dirs/a6000-d4/SegFormer/20240322_031722/iter_8000.replace.pth"
-# student_pretrained = "pretrained/s00039_01.pth"
+student_pretrained = "work_dirs/a6000-d4/SegFormer/20240322_053454/iter_138000.replace.pth"
+# student_pretrained = "work_dirs/a6000-d4/MiT-pretrain/20240321_062741/epoch_6.imnet_adapter.pth"
 # student_pretrained = "pretrained/segformer.b5.1024x1024.city.160k.replace.pth"
 
 seed = [0]
