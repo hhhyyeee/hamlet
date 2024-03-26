@@ -3,7 +3,7 @@
 
 # dataset settings
 dataset_type = 'CityscapesDataset'
-data_root = '/data/datasets/Cityscapes/'
+data_root = '/data/datasets/cityscapes/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 crop_size = (512, 512)
@@ -43,17 +43,17 @@ data = dict(
         type=dataset_type,
         data_root=data_root,
         img_dir='leftImg8bit/train',
-        ann_dir='data/Cityscapes/gtFine/train',
+        ann_dir='data/cityscapes/gtFine/train',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
         data_root=data_root,
         img_dir='leftImg8bit/val',
-        ann_dir='data/Cityscapes/gtFine/val',
+        ann_dir='data/cityscapes/gtFine/val',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
         data_root=data_root,
         img_dir='leftImg8bit/val',
-        ann_dir='data/Cityscapes/gtFine/val',
+        ann_dir='data/cityscapes/gtFine/val',
         pipeline=test_pipeline))
