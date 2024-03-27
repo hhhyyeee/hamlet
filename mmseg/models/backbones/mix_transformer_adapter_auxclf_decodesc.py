@@ -150,13 +150,9 @@ class Block(nn.Module, AdapterMixin):
             act_layer=act_layer,
             drop=drop)
 
+
     def forward(self, x, H, W):
-        a=1
-
-        # kwargs = {"Adapter": [H, W]}
         kwargs = {"H": H, "W": W}
-        # kwargs = {}
-
         x = x + self.drop_path(self.attn(self.norm1(x), H, W)) # MSA
         x = x + self.drop_path(
             self.adapt_module("mlp", self.norm2(x), **kwargs)  # MLP in AdaptFormer
@@ -180,8 +176,7 @@ class OverlapPatchEmbed(nn.Module):
 
         self.img_size = img_size
         self.patch_size = patch_size
-        self.H, self.W = img_size[0] // patch_size[0], img_size[
-            1] // patch_size[1]
+        self.H, self.W = img_size[0] // patch_size[0], img_size[1] // patch_size[1]
         self.num_patches = self.H * self.W
         self.proj = nn.Conv2d(
             in_chans,
@@ -263,6 +258,7 @@ class MixVisionTransformer(BaseModule):
 
             self.level_embed = nn.Parameter(torch.zeros(3, _embed_dim))
             normal_(self.level_embed)
+
         # --- custom decoder
         self.decoder_custom = "decoder_custom" in cfg
         a=1
@@ -537,9 +533,6 @@ class MixVisionTransformer(BaseModule):
         x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
         outs.append(x)
 
-        # stage 1-2: aux_clf (STEM?)
-        a=1
-
         # block 3
         x, H, W = self.patch_embed3(x)
         # inj_x = x.detach().clone()
@@ -569,7 +562,7 @@ class MixVisionTransformer(BaseModule):
         outs.append(x)
 
         return outs
- 
+
 
     def forward_features_ordered(self, x):
         # if not self.clf_flag:
@@ -625,8 +618,7 @@ class MixVisionTransformer(BaseModule):
         return outs, (c1, c2, c3, c4, c)
 
 
-    def forward(self, x, module=4):
-        modules = range(1, module + 1)
+    def forward(self, x):
         if self.decoder_custom:
             x = self.forward_features_ordered(x)
         else:
@@ -714,7 +706,6 @@ class DWConv(nn.Module):
 
 @BACKBONES.register_module()
 class mit_b0(MixVisionTransformer):
-
     def __init__(self, **kwargs):
         super(mit_b0, self).__init__(
             patch_size=4,
@@ -730,7 +721,6 @@ class mit_b0(MixVisionTransformer):
 
 @BACKBONES.register_module()
 class mit_b1(MixVisionTransformer):
-
     def __init__(self, **kwargs):
         super(mit_b1, self).__init__(
             patch_size=4,
@@ -746,7 +736,6 @@ class mit_b1(MixVisionTransformer):
 
 @BACKBONES.register_module()
 class mit_b2(MixVisionTransformer):
-
     def __init__(self, **kwargs):
         super(mit_b2, self).__init__(
             patch_size=4,

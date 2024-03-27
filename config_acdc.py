@@ -39,7 +39,9 @@ models = [ # (architecture, backbone)
     # ("segformer", "mitb3_custom"),
     
     # ("segformer", "mitb5_custom_adpt1"),
-    ("segformer", "mitb5_custom_adpt2"),
+    # ("segformer", "mitb5_custom_adpt2"),
+    # ("segformer", "mitb5_custom_adpt2.kldiv")
+    ("segformer", "mitb5_custom_adpt2.evp")
     # ("segformer", "mitb5_custom_adpt3"),
     # ("segformer", "mitb5_custom_adpt4"),
     # ("segformer", "mitb5_custom_adpt5"),

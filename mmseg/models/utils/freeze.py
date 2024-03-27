@@ -17,7 +17,8 @@ def freeze(module: nn.Module, *submodules: List[str]):
     #     param.requires_grad_(False)
     #     param.grad = None
     for name, param in module.named_parameters():
-        flags = [(x in name) for x in ["adapter", "stem", "injector"]]
+        flags = [(x in name) for x in ["adapter", "stem", "injector", "local_embed",
+                                       "prompt"]]
         if sum(flags) == 0: continue
         # if "adapter" not in name: continue
         param.requires_grad_(True)

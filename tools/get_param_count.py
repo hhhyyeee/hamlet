@@ -34,6 +34,19 @@ def count_parameters(model):
     print(f'Total Trainable Params: {human_format(total_params)}')
     return total_params
 
+def count_all_parameters(model):
+    table = PrettyTable(['Modules', 'Parameters'])
+    total_params = 0
+    for name, parameter in model.named_parameters():
+        # if not parameter.requires_grad:
+        #     continue
+        param = parameter.numel()
+        table.add_row([name, human_format(param)])
+        total_params += param
+    print(table)
+    print(f'Total Trainable Params: {human_format(total_params)}')
+    return total_params
+
 
 # Run: python -m tools.param_count
 if __name__ == '__main__':

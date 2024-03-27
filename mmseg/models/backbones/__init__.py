@@ -14,6 +14,9 @@ from .resnet import ResNet, ResNetV1c, ResNetV1d
 from .resnext import ResNeXt
 # from .swin_transformer import SwinTransformer
 
+from .mix_transformer_evp_adapter_auxclf import (MixVisionTransformerEVP, mit_b0_evp, mit_b1_evp, mit_b2_evp,
+                                                 mit_b3_evp, mit_b4_evp, mit_b5_evp)
+
 __all__ = [
     'ResNet',
     'ResNetV1c',
@@ -28,4 +31,6 @@ __all__ = [
     'mit_b4',
     'mit_b5',
     # 'SwinTransformer'
+    'MixVisionTransformerEVP',
+    'mit_b5_evp'
 ]
