@@ -973,6 +973,23 @@ backprop에서 에러가 나는거보니 뭔가 그래프가 이상하게 만들
     - 테스트 1) `240312_0626_cs2acdc_dacs_online_rcs001_cpl_segformer_mitb5_custom_adpt8_fixed_s0_b5c3a`
 
 
+# 240401
+## DACS_TENT
+* `mmseg/models/uda/dacs_tent.py`
+    ```
+    self.tent = cfg.get("tent_for_dacs", None)
+    ```
+    - `configs/_base_/uda/dacs_tent_a999_fdthings.py` 파일 내부의 키워드 "tent_for_dacs"를 참조하여 tent_loss 사용 여부를 지정할 수 있음
+    - 성능이 어떨지는... 장담 X
+
+## EVP
+* 실험 관련
+    - SegFormer-EVP source에 적합시킨 모델 (latest)가 생각보다 잘 안 나와서 overfitting을 의심중 (하지만... 아닐 것 같음)
+    - 성능 저하는 tent_loss 때문이 아닐까 의심중
+
+
+
+
 
 
 

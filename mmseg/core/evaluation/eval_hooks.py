@@ -388,7 +388,8 @@ class OnlineEvalHook(_EvalHook):
 
         #!DEBUG
         elif (
-                runner.model_name == "DACS"
+                # runner.model_name == "DACS"
+                "DACS" in runner.model_name
                 and runner.model.module.model_type == "OthersEncoderDecoder"
         ):
             dataset_name = "unknown" if dataset_name is None else dataset_name

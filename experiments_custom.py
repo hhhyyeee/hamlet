@@ -353,7 +353,9 @@ def generate_experiment_cfgs(id):
                 threshold_indicator=threshold_indicator,
                 mode_train=mode_train,
             )
-            cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings.py")
+            cfg["_base_"].append(f"_base_/uda/dacs_tent_a999_fdthings.py")
+            # cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings_to.py")
+            # cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings.py")
             # cfg["_base_"].append(f"_base_/uda/dacs_a999_fd.py")
             # wandb tags
             name_ds = target
