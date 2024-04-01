@@ -357,7 +357,23 @@ class DACS(CustomUDADecorator):
             feat_imnet = [f.detach() for f in feat_imnet]
         lay = -1  # if not self.modular_model else self.num_module - 1
 
-        feat_dist = self.masked_feat_dist(feat[lay], feat_imnet[lay])
+        if self.fdist_classes is not None:
+            fdclasses = torch.tensor(self.fdist_classes, device=gt.device)
+            scale_factor = gt.shape[-1] // feat[lay].shape[-1]
+            gt_rescaled = (
+                downscale_label_ratio(
+                    gt, scale_factor, self.fdist_scale_min_ratio, self.num_classes, 255
+                )
+                .long()
+                .detach()
+            )
+            fdist_mask = torch.any(gt_rescaled[..., None] == fdclasses, -1)
+            feat_dist = self.masked_feat_dist(feat[lay], feat_imnet[lay], fdist_mask)
+            self.debug_fdist_mask = fdist_mask
+            self.debug_gt_rescale = gt_rescaled
+        else:
+            feat_dist = self.masked_feat_dist(feat[lay], feat_imnet[lay])
+
         feat_dist = self.target_fdist_lambda * feat_dist
         feat_loss, feat_log = self._parse_losses({"loss_imnet_feat_dist": feat_dist})
         feat_log.pop("loss", None)

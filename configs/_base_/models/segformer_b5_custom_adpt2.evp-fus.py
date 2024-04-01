@@ -14,7 +14,7 @@ model = dict(
         style='pytorch',
         pet_cls='Adapter',
         adapt_blocks=[0, 1, 2, 3],
-        aux_classifier=False,
+        # aux_classifier=False,
         scale_factor=4,
         input_type="fft",
         freq_nums=0.25,
@@ -22,7 +22,7 @@ model = dict(
         tuning_stage=1234,
         handcrafted_tune=True,
         embedding_tune=True,
-        adaptor="adaptor"
+        adaptor="fully_unshared"
         ),
     decode_head=dict(
         type='OriginalSegFormerHead',
