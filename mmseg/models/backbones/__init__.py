@@ -32,5 +32,5 @@ __all__ = [
     'mit_b5',
     # 'SwinTransformer'
     'MixVisionTransformerEVP',
-    'mit_b5_evp'
+    'mit_b5_evp',
 ]
