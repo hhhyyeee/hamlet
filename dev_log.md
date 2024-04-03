@@ -982,11 +982,63 @@ backprop에서 에러가 나는거보니 뭔가 그래프가 이상하게 만들
     - `configs/_base_/uda/dacs_tent_a999_fdthings.py` 파일 내부의 키워드 "tent_for_dacs"를 참조하여 tent_loss 사용 여부를 지정할 수 있음
     - 성능이 어떨지는... 장담 X
 
-## EVP
 * 실험 관련
-    - SegFormer-EVP source에 적합시킨 모델 (latest)가 생각보다 잘 안 나와서 overfitting을 의심중 (하지만... 아닐 것 같음)
-    - 성능 저하는 tent_loss 때문이 아닐까 의심중
+    - SegFormer-EVP source에 적합시킨 모델 (latest)가 생각보다 잘 안 나와서 overfitting을 의심중
+        - SegFormer 전체에 대해 pretrain 된 weights 조차도 ACDC 첫 추론의 output이 터무니가 없기 때문
+        - 따라서 SegFormer adpt2에 augmentation을 추가해서 학습하는 것을 시도중
+            - 추가한 augmentation
+                ```
+                dict(type="CLAHE"),
+                dict(type="RGB2Gray"),
+                dict(type="AdjustGamma"),
+                ```
+            - 실험 시리얼: `20240402_062850`
 
+
+# 240402
+## DACS_TENT
+* `20240402_062850` iter_4000.replace.pth 실험
+    - 이것도 initial output이 별로임 ㅠㅠ 왜 그럴까?
+    - ema_model.encode_decode() 함수를 확인해 볼 것...
+
+## CVP 아이데이션 (1)
+* `mmseg/models/backbone/mix_transformer_cvp.py`
+    - conv_generator의 인풋
+        ```
+        for o in (c1, c2, c3, c4, c):
+        print(o.shape)
+
+        =>
+        torch.Size([1, 320, 128, 128])
+        torch.Size([1, 4096, 320])
+        torch.Size([1, 1024, 320])
+        torch.Size([1, 256, 320])
+        torch.Size([1, 5376, 320])
+        ```
+        - 얘네 중에 뭘 넣어야 할까?
+    - conv_generator의 아웃풋: [1, 16384, 64 -> 16]
+        - 16384 = 128 * 128
+        - 어떻게 만드는 것이 적절할까?
+
+
+# 240403
+## ViDA
+* trainable params 개수는 얼마일까?
+
+    - baseline (ViT-B/16)
+        - all params: 86,567,656
+
+    - baseline + vida
+        - all params: 93,700,840
+        - trainable params: 7,133,184 (0.07612721508153)
+            - vida_params_list: 36864 (0.005167958656331)
+            - high: 5313024 (0.744832041343669)
+            - low: 1783296 (0.25)
+
+## CVP 아이데이션 (2)
+* `mmseg/models/backbone/mix_transformer_cvp.py`
+    - ViT-adapter Spatial Pyramid Module
+        - 그대로 활용하되 4개 output들을 transformer blocks 4개에 각각 넣어줌
 
 
 

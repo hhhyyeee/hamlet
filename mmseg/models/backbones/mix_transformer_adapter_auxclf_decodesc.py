@@ -248,7 +248,8 @@ class MixVisionTransformer(BaseModule):
             self.embed_dims_adapter = [_dim for idx, _dim in enumerate(embed_dims) if idx in adapt_blocks]
 
         # --- auxiliary classifier
-        self.clf_flag = cfg["aux_classifier"]
+        # self.clf_flag = cfg["aux_classifier"]
+        self.clf_flag = cfg.get("aux_classifier", None)
         if self.clf_flag:
             a=1
             _embed_dim = embed_dims[2]

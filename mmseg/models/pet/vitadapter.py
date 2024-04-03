@@ -243,7 +243,7 @@ class Injector(nn.Module):
 #                               feat=x, spatial_shapes=deform_inputs2[1],
 #                               level_start_index=deform_inputs2[2], H=H, W=W)
 #         return x, c, cls
-    
+
 
 class SpatialPriorModule(nn.Module):
     def __init__(self, inplanes=64, embed_dim=384, with_cp=False):
@@ -306,6 +306,99 @@ class SpatialPriorModule(nn.Module):
             outs = cp.checkpoint(_inner_forward, x)
         else:
             outs = _inner_forward(x)
+        return outs
+
+
+class CustomSpatialPriorModule(nn.Module):
+    def __init__(self, inplanes=64, embed_dim=384, with_cp=False, **kwargs):
+        super().__init__()
+        self.with_cp = with_cp
+        embed_dims = kwargs["embed_dims"]
+        inplanes = embed_dims[0]
+
+        self.stem = nn.Sequential(*[
+            nn.Conv2d(3, inplanes, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(inplanes),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(inplanes, inplanes, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(inplanes),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(inplanes, inplanes, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(inplanes),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        ])
+        self.conv2 = nn.Sequential(*[
+            nn.Conv2d(inplanes, embed_dims[1], kernel_size=3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(embed_dims[1]),
+            nn.ReLU(inplace=True)
+        ])
+        self.conv3 = nn.Sequential(*[
+            nn.Conv2d(embed_dims[1], embed_dims[2], kernel_size=3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(embed_dims[2]),
+            nn.ReLU(inplace=True)
+        ])
+        self.conv4 = nn.Sequential(*[
+            nn.Conv2d(embed_dims[2], embed_dims[3], kernel_size=3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(embed_dims[3]),
+            nn.ReLU(inplace=True)
+        ])
+        a=1
+        self.fc1 = nn.Conv2d(inplanes, embed_dim, kernel_size=1, stride=1, padding=0, bias=True)
+        self.fc2 = nn.Conv2d(embed_dims[1], embed_dim, kernel_size=1, stride=1, padding=0, bias=True)
+        self.fc3 = nn.Conv2d(embed_dims[2], embed_dim, kernel_size=1, stride=1, padding=0, bias=True)
+        self.fc4 = nn.Conv2d(embed_dims[3], embed_dim, kernel_size=1, stride=1, padding=0, bias=True)
+
+    def forward(self, x):
+        
+        def _inner_forward(x):
+            c1 = self.stem(x)
+            c2 = self.conv2(c1)
+            c3 = self.conv3(c2)
+            c4 = self.conv4(c3)
+            c1 = self.fc1(c1)
+            c2 = self.fc2(c2)
+            c3 = self.fc3(c3)
+            c4 = self.fc4(c4)
+    
+            bs, dim, _, _ = c1.shape
+            # c1 = c1.view(bs, dim, -1).transpose(1, 2)  # 4s
+            c2 = c2.view(bs, dim, -1).transpose(1, 2)  # 8s
+            c3 = c3.view(bs, dim, -1).transpose(1, 2)  # 16s
+            c4 = c4.view(bs, dim, -1).transpose(1, 2)  # 32s
+    
+            return c1, c2, c3, c4
+
+        def _custom_inner_forward(x):
+            c1 = self.stem(x)
+            c2 = self.conv2(c1)
+            c3 = self.conv3(c2)
+            c4 = self.conv4(c3)
+
+            bs = c1.shape[0]
+            c1 = c1.view(bs, c1.shape[1], -1).transpose(1, 2)
+            c2 = c2.view(bs, c2.shape[1], -1).transpose(1, 2)
+            c3 = c3.view(bs, c3.shape[1], -1).transpose(1, 2)
+            c4 = c4.view(bs, c4.shape[1], -1).transpose(1, 2)
+
+            # _c1 = self.fc1(c1)
+            # _c2 = self.fc2(c2)
+            # _c3 = self.fc3(c3)
+            # _c4 = self.fc4(c4)
+
+            # bs, dim, _, _ = c1.shape
+            # # c1 = c1.view(bs, dim, -1).transpose(1, 2)  # 4s
+            # _c2 = _c2.view(bs, dim, -1).transpose(1, 2)  # 8s
+            # _c3 = _c3.view(bs, dim, -1).transpose(1, 2)  # 16s
+            # _c4 = _c4.view(bs, dim, -1).transpose(1, 2)  # 32s
+
+            return c1, c2, c3, c4
+
+        if self.with_cp and x.requires_grad:
+            outs = cp.checkpoint(_inner_forward, x)
+        else:
+            # outs = _inner_forward(x)
+            outs = _custom_inner_forward(x)
         return outs
 
 

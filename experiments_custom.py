@@ -104,6 +104,8 @@ def get_backbone_cfg(backbone):
         # if backbone == f"mitb{i}":
             if "evp" in backbone:
                 return dict(type=f"mit_b{i}_evp")
+            elif "cvp" in backbone:
+                return dict(type=f"mit_b{i}_cvp")
             return dict(type=f"mit_b{i}")
         if backbone == f"mitb{i}-del":
             return dict(_delete_=True, type=f"mit_b{i}")
@@ -353,9 +355,9 @@ def generate_experiment_cfgs(id):
                 threshold_indicator=threshold_indicator,
                 mode_train=mode_train,
             )
-            cfg["_base_"].append(f"_base_/uda/dacs_tent_a999_fdthings.py")
+            # cfg["_base_"].append(f"_base_/uda/dacs_tent_a999_fdthings.py")
             # cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings_to.py")
-            # cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings.py")
+            cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings.py")
             # cfg["_base_"].append(f"_base_/uda/dacs_a999_fd.py")
             # wandb tags
             name_ds = target
