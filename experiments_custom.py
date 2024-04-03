@@ -104,6 +104,8 @@ def get_backbone_cfg(backbone):
         # if backbone == f"mitb{i}":
             if "evp" in backbone:
                 return dict(type=f"mit_b{i}_evp")
+            elif "cvp" in backbone:
+                return dict(type=f"mit_b{i}_cvp")
             return dict(type=f"mit_b{i}")
         if backbone == f"mitb{i}-del":
             return dict(_delete_=True, type=f"mit_b{i}")
