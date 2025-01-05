@@ -384,9 +384,6 @@ class DACS_TENT(CustomUDADecorator):
         #!DEBUG
         target_gt_semantic_seg = kwargs.get("target_gt_semantic_seg", None)
 
-        #  module to forward
-        # main_model = self.get_main_model()
-
         # Init/update ema model
         if self.local_iter == 0:
             self._init_ema_weights()

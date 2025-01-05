@@ -357,7 +357,9 @@ def generate_experiment_cfgs(id):
             )
             # cfg["_base_"].append(f"_base_/uda/dacs_tent_a999_fdthings.py")
             # cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings_to.py")
-            cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings.py")
+            cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings.custom.lambda01.py")
+            # cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings.custom.py")
+            # cfg["_base_"].append(f"_base_/uda/dacs_a999_fdthings.py")
             # cfg["_base_"].append(f"_base_/uda/dacs_a999_fd.py")
 
             # wandb tags

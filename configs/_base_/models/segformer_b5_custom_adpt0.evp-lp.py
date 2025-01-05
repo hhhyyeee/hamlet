@@ -10,21 +10,16 @@ model = dict(
     type='OthersEncoderDecoder',
     pretrained='pretrained/mit_b5.pth',
     backbone=dict(
-        type='mit_b5_cvp',
+        type='mit_b5_evp',
         style='pytorch',
-        pet_cls='Adapter',
-        adapt_blocks=[0, 1, 2, 3],
 
         scale_factor=4,
         input_type="fft",
         freq_nums=0.25,
         prompt_type="lowpass",
         tuning_stage=1234,
-
         handcrafted_tune=True,
-        embedding_tune=False,
-        conv_tune=True, #!DEBUG
-
+        embedding_tune=True,
         adaptor="adaptor"
         ),
     decode_head=dict(

@@ -5,7 +5,6 @@ datasets = [ # (source, target)
 ]
 
 domain_order = [
-    # ["fog"]
     ["fog", "night", "rain", "snow"] + ["rain", "night", "fog"]
 ]
 num_epochs = 3
@@ -43,9 +42,11 @@ models = [ # (architecture, backbone)
     # ("segformer", "mitb5_custom_adpt1"),
     # ("segformer", "mitb5_custom_adpt2"),
     # ("segformer", "mitb5_custom_adpt2.kldiv")
-    ("segformer", "mitb5_custom_adpt2.evp")
+    # ("segformer", "mitb5_custom_adpt2.evp")
+    # ("segformer", "mitb5_custom_adpt2.evp-lp")
     # ("segformer", "mitb5_custom_adpt2.evp-fs")
     # ("segformer", "mitb5_custom_adpt2.evp-fus")
+    ("segformer", "mitb5_custom_adpt2.cvp")
     # ("segformer", "mitb5_custom_adpt3"),
     # ("segformer", "mitb5_custom_adpt4"),
     # ("segformer", "mitb5_custom_adpt5"),
@@ -157,10 +158,11 @@ modules_update = "random_modules/online_random.npy"
 pretrained_segmentator = "pretrained/mit_b5.replace.pth"
 # student_pretrained = "pretrained/segformer.b5.1024x1024.city.160k.replace.pth"
 # student_pretrained = "work_dirs/a6000-d4/SegFormer/20240322_053454/iter_138000.replace.pth"
+# student_pretrained = '/ssd_data1/hyewon/hamlet/work_dirs/a6000-d4/SegFormer/20240402_064146/iter_40000.replace.pth'
 # student_pretrained = "work_dirs/a6000-d4/MiT-pretrain/20240321_062741/epoch_6.imnet_adapter.pth"
-# student_pretrained = "pretrained/segformer.b5.1024x1024.city.160k.replace.pth"
-# student_pretrained = "work_dirs/a6000-d4/SegFormer/20240329_073349/latest.replace.pth" #adpt0-evp
-student_pretrained = "work_dirs/a6000-d4/SegFormer/20240329_074002/latest.replace.pth" #adpt2-evp
+student_pretrained = "pretrained/segformer.b5.1024x1024.city.160k.replace.pth"
+# student_pretrained = "work_dirs/a6000-d4/SegFormer/20240329_073349/iter_80000.replace.pth" #adpt0-evp
+# student_pretrained = "work_dirs/a6000-d4/SegFormer/20240329_074002/latest.replace.pth" #adpt2-evp
 
 seed = [0]
 perfect_determinism = False

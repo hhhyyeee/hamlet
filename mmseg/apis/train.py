@@ -57,7 +57,7 @@ def train_segmentor(
     #     # for param in model.model.backbone.parameters():
     #     #     param.requires_grad = False
 
-    from tools.get_param_count import count_parameters #!DEBUG
+    from tools.get_param_count import count_parameters, count_all_parameters #!DEBUG
     count_parameters(model.model)
     count_parameters(model.ema_model)
 

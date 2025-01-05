@@ -18,7 +18,7 @@ from mmseg.models.pet_mixin import AdapterMixin
 from mmseg.utils import get_root_logger
 from mmcv.runner import load_checkpoint
 
-from mmseg.models.pet.vitadapter import CustomSpatialPriorModule
+from mmseg.models.pet.vitadapter import SpatialPriorModule, CustomSpatialPriorModule
 from torch.nn.init import normal_
 
 
@@ -303,7 +303,7 @@ class MixVisionTransformerCVP(nn.Module):
         if self.clf_flag:
             a=1
             _embed_dim = embed_dims[2]
-            self.stem = CustomSpatialPriorModule(embed_dim=_embed_dim)
+            self.stem = SpatialPriorModule(embed_dim=_embed_dim)
             # self.injector = Injector(dim=_embed_dim, num_heads=8, n_levels=3) #embed_dims[2]가 320인데 320/8=40으로 딱 떨어질 수 있도록 num_heads 설정
 
             self.level_embed = nn.Parameter(torch.zeros(3, _embed_dim))
@@ -709,7 +709,7 @@ class PromptGenerator(nn.Module):
                 self.embedding_generator4 = nn.Linear(self.embed_dims[3], self.embed_dims[3] // self.scale_factor)
 
         if self.conv_tune:
-            self.spm = SpatialPriorModule(**{"embed_dims": self.embed_dims})
+            self.spm = CustomSpatialPriorModule(**{"embed_dims": self.embed_dims})
             #! level_embed가 필요할지? 왜 필요할지?
             if '1' in self.tuning_stage:
                 self.conv_generator1 = nn.Linear(self.embed_dims[0], self.embed_dims[0] // self.scale_factor)
